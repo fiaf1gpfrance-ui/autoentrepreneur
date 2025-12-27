@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Company, LegalStatus, Sector, LEGAL_STATUS_MODIFIERS, SECTOR_MODIFIERS } from "@/types/game";
+import { Company, LegalStatus, Sector, LEGAL_STATUS_MODIFIERS } from "@/types/game";
 import { formatCurrency, generateEmployee } from "@/utils/gameEngine";
+import { createCompany } from "@/utils/companyFactory";
 import { Building2, Scale, Factory, Cpu, Wrench, HeadphonesIcon, Cog } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -67,37 +68,11 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
     if (!companyName || !legalStatus || !sector) return;
 
     const statusMod = LEGAL_STATUS_MODIFIERS[legalStatus];
+    const company = createCompany(companyName, legalStatus, sector, capital, 1);
     
-    const company: Company = {
-      name: companyName,
-      legalStatus,
-      sector,
-      capital,
-      treasury: capital,
-      credibility: 50 + statusMod.credibilityBonus,
-      employees: [generateEmployee(sector, 1)],
-      products: [{
-        id: 'prod_initial',
-        name: "Produit Initial",
-        phase: 'rd',
-        rdCost: 5000,
-        rdProgress: 0,
-        basePrice: 100,
-        currentPrice: 100,
-        quality: 50,
-        marketingBudget: 0,
-        salesVolume: 0,
-        phaseStartDay: 1,
-      }],
-      taxDeclarations: [],
-      monthlyRevenue: 0,
-      monthlyExpenses: 0,
-      tvaCollected: 0,
-      tvaDeductible: 0,
-      urssafDebt: 0,
-      isDebt: 0,
-      financialHistory: [],
-    };
+    // Apply credibility bonus from legal status and add initial employee
+    company.credibility = 50 + statusMod.credibilityBonus;
+    company.employees = [generateEmployee(sector, 1)];
 
     onComplete(company);
   };
