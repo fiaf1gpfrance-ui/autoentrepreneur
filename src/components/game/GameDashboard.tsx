@@ -50,6 +50,10 @@ import { HRAdvancedPanel } from "./HRAdvancedPanel";
 import { LegalPanel } from "./LegalPanel";
 import { GameplayPanel } from "./GameplayPanel";
 import { InternationalPanel } from "./InternationalPanel";
+import { AchievementsPanel } from "./AchievementsPanel";
+import { MarketingPanel } from "./MarketingPanel";
+import { TechnologyPanel } from "./TechnologyPanel";
+import { CrisesPanel } from "./CrisesPanel";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   Wallet, 
@@ -77,6 +81,10 @@ import {
   Scale,
   BarChart3,
   Globe,
+  Trophy,
+  Megaphone,
+  Cpu,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -93,7 +101,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises';
 
 export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
@@ -827,6 +835,10 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
 
   const tabs = [
     { id: 'overview', label: 'Aperçu', icon: TrendingUp },
+    { id: 'achievements', label: 'Trophées', icon: Trophy },
+    { id: 'marketing', label: 'Marketing', icon: Megaphone },
+    { id: 'technology', label: 'R&D', icon: Cpu },
+    { id: 'crises', label: 'Crises', icon: AlertTriangle },
     { id: 'banking', label: 'Banque', icon: Landmark },
     { id: 'realestate', label: 'Immobilier', icon: Building },
     { id: 'supply', label: 'Supply Chain', icon: Truck },
@@ -943,6 +955,44 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                 {company.employees.slice(0, 3).map(employee => (<EmployeeCard key={employee.id} employee={employee} />))}
                 {company.products.slice(0, 3).map(product => (<ProductCard key={product.id} product={product} />))}
               </div>
+            )}
+
+            {activeTab === 'achievements' && (
+              <AchievementsPanel
+                achievements={company.achievements}
+                missions={company.missions}
+              />
+            )}
+
+            {activeTab === 'marketing' && (
+              <MarketingPanel
+                campaigns={[]}
+                treasury={company.treasury}
+                reputation={company.reputation}
+                onLaunchCampaign={(channel, budget, duration) => {
+                  toast.success(`Campagne ${channel} lancée !`);
+                }}
+              />
+            )}
+
+            {activeTab === 'technology' && (
+              <TechnologyPanel
+                technologies={[]}
+                treasury={company.treasury}
+                onStartResearch={(techId) => {
+                  toast.success("Recherche lancée !");
+                }}
+              />
+            )}
+
+            {activeTab === 'crises' && (
+              <CrisesPanel
+                activeCrises={[]}
+                treasury={company.treasury}
+                onRespondToCrisis={(crisisId, responseId) => {
+                  toast.success("Réponse appliquée !");
+                }}
+              />
             )}
 
             {activeTab === 'banking' && (
