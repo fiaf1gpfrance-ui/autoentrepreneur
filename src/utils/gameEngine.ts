@@ -90,8 +90,9 @@ export function generateEmployee(sector: string, day: number): Employee {
   const firstNames = ['Marie', 'Thomas', 'Sophie', 'Lucas', 'Emma', 'Hugo', 'Léa', 'Nathan', 'Chloé', 'Louis'];
   const lastNames = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau'];
   const roles = ['Développeur', 'Commercial', 'Comptable', 'Manager', 'Technicien', 'Designer', 'RH', 'Marketing'];
-  const traits: EmployeeTrait[] = ['syndicaliste', 'workaholic', 'creatif', 'rigoureux', 'leader', 'discret'];
+  const traits: EmployeeTrait[] = ['syndicaliste', 'workaholic', 'creatif', 'rigoureux', 'leader', 'discret', 'negociateur', 'perfectionniste'];
   const contracts: ContractType[] = ['cdi', 'cdd', 'alternance'];
+  const educations: Employee['education'][] = ['bac', 'bac+2', 'bac+3', 'bac+5', 'doctorat'];
 
   const baseSalary = SECTOR_MODIFIERS[sector as keyof typeof SECTOR_MODIFIERS]?.salaryMultiplier || 1;
   const roleMultiplier = Math.random() * 0.5 + 0.8;
@@ -107,6 +108,15 @@ export function generateEmployee(sector: string, day: number): Employee {
     brutSalary: Math.round(2500 * baseSalary * roleMultiplier),
     hireDate: day,
     productivity: 100,
+    seniority: 0,
+    experience: Math.floor(Math.random() * 5),
+    education: educations[Math.floor(Math.random() * educations.length)],
+    trainings: [],
+    promotions: 0,
+    absences: 0,
+    warnings: 0,
+    bonus: 0,
+    benefits: [],
   };
 }
 
@@ -512,5 +522,28 @@ export function createInitialState(): GameState {
     activeEvents: [],
     gameOver: false,
     consecutiveNegativeMonths: 0,
+    inflationRate: 0.02,
+    interestRate: 0.04,
+    exchangeRates: { EUR: 1, USD: 1.08, GBP: 0.86, CHF: 0.94, JPY: 160, CNY: 7.8 },
+    marketTrends: { tech: 1.1, artisanat: 1.0, services: 1.0, industrie: 0.95 },
+    globalEconomy: 100,
+    tutorialCompleted: false,
+    difficulty: 'normal',
+    statistics: {
+      totalRevenue: 0,
+      totalExpenses: 0,
+      totalTaxesPaid: 0,
+      totalSalariesPaid: 0,
+      employeesHired: 0,
+      employeesFired: 0,
+      productsLaunched: 0,
+      contractsSigned: 0,
+      lawsuitsWon: 0,
+      lawsuitsLost: 0,
+      loansRepaid: 0,
+      investmentsReturned: 0,
+      countriesExpanded: 0,
+      achievementsUnlocked: 0,
+    },
   };
 }
