@@ -1,13 +1,62 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useEffect } from "react";
+import { GameState } from "@/types/game";
+import { createInitialState, loadGame, saveGame } from "@/utils/gameEngine";
+import { CompanySetup } from "@/components/game/CompanySetup";
+import { GameDashboard } from "@/components/game/GameDashboard";
 
 const Index = () => {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Try to load saved game
+    const savedGame = loadGame();
+    if (savedGame && savedGame.company) {
+      setGameState(savedGame);
+    } else {
+      setGameState(createInitialState());
+    }
+    setIsLoading(false);
+  }, []);
+
+  const handleCompanyCreated = (company: GameState['company']) => {
+    const newState: GameState = {
+      ...createInitialState(),
+      company,
+      isPaused: false,
+    };
+    setGameState(newState);
+    saveGame(newState);
+  };
+
+  const handleReset = () => {
+    localStorage.removeItem('simu_entrepreneur_save');
+    setGameState(createInitialState());
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center animate-pulse">
+          <h1 className="text-2xl font-display font-bold text-primary text-glow">
+            Chargement...
+          </h1>
+        </div>
       </div>
-    </div>
+    );
+  }
+
+  if (!gameState) return null;
+
+  if (!gameState.company) {
+    return <CompanySetup onComplete={handleCompanyCreated} />;
+  }
+
+  return (
+    <GameDashboard 
+      initialState={gameState} 
+      onReset={handleReset}
+    />
   );
 };
 
