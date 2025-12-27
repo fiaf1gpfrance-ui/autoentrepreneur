@@ -27,7 +27,7 @@ const contractLabels: Record<string, string> = {
 export function EmployeeCard({ employee, onFire }: EmployeeCardProps) {
   const superBrut = calculateSuperBrut(employee.brutSalary);
   const netSalary = calculateNetSalary(employee.brutSalary);
-  const trait = traitLabels[employee.trait];
+  const trait = traitLabels[employee.trait] || { label: employee.trait || "Standard", color: "bg-muted text-muted-foreground" };
 
   return (
     <div className="game-panel space-y-3">
