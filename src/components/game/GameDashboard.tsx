@@ -793,6 +793,123 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     }));
   }, []);
 
+  // ==================== MARKETING ACTIONS ====================
+  const handleLaunchCampaign = useCallback((channel: string, budget: number, duration: number) => {
+    if (company.treasury < budget) {
+      toast.error("Trésorerie insuffisante");
+      return;
+    }
+
+    const channelNames: Record<string, string> = {
+      social: "Réseaux Sociaux", seo: "SEO", ads: "Publicité", email: "Email",
+      events: "Événement", pr: "Relations Presse", influencer: "Influenceur", tv: "TV"
+    };
+
+    const newCampaign = {
+      id: `camp_${Date.now()}`,
+      name: `Campagne ${channelNames[channel] || channel}`,
+      channel,
+      budget,
+      duration,
+      startDate: gameState.day,
+      reach: Math.floor((budget / 1000) * 5000 * (company.reputation / 50)),
+      conversions: 0,
+      roi: 0,
+      active: true,
+    };
+
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        treasury: prev.company!.treasury - budget,
+        marketingCampaigns: [...prev.company!.marketingCampaigns, newCampaign],
+      },
+    }));
+    toast.success(`Campagne ${channelNames[channel]} lancée !`);
+  }, [company.treasury, company.reputation, gameState.day]);
+
+  const handlePauseCampaign = useCallback((campaignId: string) => {
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        marketingCampaigns: prev.company!.marketingCampaigns.map(c =>
+          c.id === campaignId ? { ...c, active: !c.active } : c
+        ),
+      },
+    }));
+  }, []);
+
+  // ==================== TECHNOLOGY ACTIONS ====================
+  const handleStartResearch = useCallback((techId: string) => {
+    const tech = company.technologies.find(t => t.id === techId);
+    if (!tech || tech.unlocked || tech.researching) return;
+    if (company.treasury < tech.cost) {
+      toast.error("Trésorerie insuffisante");
+      return;
+    }
+
+    const prereqsMet = tech.prerequisites.every(prereqId =>
+      company.technologies.find(t => t.id === prereqId)?.unlocked
+    );
+    if (!prereqsMet) {
+      toast.error("Prérequis non remplis");
+      return;
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        treasury: prev.company!.treasury - tech.cost,
+        technologies: prev.company!.technologies.map(t =>
+          t.id === techId ? { ...t, researching: true, progress: 0 } : t
+        ),
+      },
+    }));
+    toast.success(`R&D lancée: ${tech.name}`);
+  }, [company.technologies, company.treasury]);
+
+  const handleCancelResearch = useCallback((techId: string) => {
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        technologies: prev.company!.technologies.map(t =>
+          t.id === techId ? { ...t, researching: false, progress: 0 } : t
+        ),
+      },
+    }));
+    toast.info("Recherche annulée");
+  }, []);
+
+  // ==================== CRISIS ACTIONS ====================
+  const handleRespondToCrisis = useCallback((crisisId: string, responseId: string) => {
+    const crisis = company.activeCrises.find(c => c.id === crisisId);
+    if (!crisis) return;
+
+    const response = crisis.responses.find(r => r.id === responseId);
+    if (!response) return;
+
+    if (company.treasury < response.cost) {
+      toast.error("Trésorerie insuffisante");
+      return;
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        treasury: prev.company!.treasury - response.cost,
+        reputation: Math.min(100, prev.company!.reputation + (response.effectiveness / 10)),
+        activeCrises: prev.company!.activeCrises.filter(c => c.id !== crisisId),
+        resolvedCrises: [...prev.company!.resolvedCrises, { ...crisis, active: false }],
+      },
+    }));
+    toast.success(`Crise "${crisis.name}" résolue !`);
+  }, [company.activeCrises, company.treasury]);
+
   const handleSave = useCallback(() => {
     saveGame(gameState);
     toast.success("Partie sauvegardée !");
@@ -966,32 +1083,29 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
 
             {activeTab === 'marketing' && (
               <MarketingPanel
-                campaigns={[]}
+                campaigns={company.marketingCampaigns}
                 treasury={company.treasury}
                 reputation={company.reputation}
-                onLaunchCampaign={(channel, budget, duration) => {
-                  toast.success(`Campagne ${channel} lancée !`);
-                }}
+                onLaunchCampaign={handleLaunchCampaign}
+                onPauseCampaign={handlePauseCampaign}
               />
             )}
 
             {activeTab === 'technology' && (
               <TechnologyPanel
-                technologies={[]}
+                technologies={company.technologies}
                 treasury={company.treasury}
-                onStartResearch={(techId) => {
-                  toast.success("Recherche lancée !");
-                }}
+                onStartResearch={handleStartResearch}
+                onCancelResearch={handleCancelResearch}
               />
             )}
 
             {activeTab === 'crises' && (
               <CrisesPanel
-                activeCrises={[]}
+                activeCrises={company.activeCrises}
+                resolvedCrises={company.resolvedCrises}
                 treasury={company.treasury}
-                onRespondToCrisis={(crisisId, responseId) => {
-                  toast.success("Réponse appliquée !");
-                }}
+                onRespondToCrisis={handleRespondToCrisis}
               />
             )}
 
