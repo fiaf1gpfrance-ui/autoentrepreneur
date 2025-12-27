@@ -12,6 +12,7 @@ import {
   getCredibilityColor,
   getMoralColor,
 } from "@/utils/gameEngine";
+import { createProduct } from "@/utils/productFactory";
 import { StatCard } from "./StatCard";
 import { GaugeBar } from "./GaugeBar";
 import { EventCard } from "./EventCard";
@@ -188,19 +189,10 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     }
 
     const productNames = ["Innovation X", "Service Pro", "Solution Plus", "Offre Premium", "Pack Business"];
-    const newProduct = {
-      id: `prod_${Date.now()}`,
-      name: productNames[Math.floor(Math.random() * productNames.length)],
-      phase: 'rd' as const,
-      rdCost: 10000,
-      rdProgress: 0,
-      basePrice: 150,
-      currentPrice: 150,
-      quality: 40 + Math.floor(Math.random() * 30),
-      marketingBudget: 0,
-      salesVolume: 50 + Math.floor(Math.random() * 100),
-      phaseStartDay: gameState.day,
-    };
+    const newProduct = createProduct(
+      productNames[Math.floor(Math.random() * productNames.length)],
+      gameState.day
+    );
 
     setGameState(prev => ({
       ...prev,
