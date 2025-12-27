@@ -497,6 +497,68 @@ export interface Company {
   innovationScore: number;
   totalAssets: number;
   totalLiabilities: number;
+  // New: Marketing, Technology, Crises
+  marketingCampaigns: MarketingCampaign[];
+  technologies: TechnologyItem[];
+  activeCrises: CrisisItem[];
+  resolvedCrises: CrisisItem[];
+}
+
+// Marketing Campaign for state
+export interface MarketingCampaign {
+  id: string;
+  name: string;
+  channel: string;
+  budget: number;
+  duration: number;
+  startDate: number;
+  reach: number;
+  conversions: number;
+  roi: number;
+  active: boolean;
+}
+
+// Technology Item for state
+export interface TechnologyItem {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  cost: number;
+  researchTime: number;
+  productivity: number;
+  unlocked: boolean;
+  researching: boolean;
+  progress: number;
+  prerequisites: string[];
+}
+
+// Crisis Item for state
+export interface CrisisItem {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  severity: 1 | 2 | 3 | 4 | 5;
+  effects: {
+    revenue?: number;
+    reputation?: number;
+    employees?: number;
+    costs?: number;
+  };
+  responses: CrisisResponseOption[];
+  active: boolean;
+  duration: number;
+  startedAt?: number;
+}
+
+export interface CrisisResponseOption {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  effectiveness: number;
+  duration: number;
 }
 
 export interface GameState {
