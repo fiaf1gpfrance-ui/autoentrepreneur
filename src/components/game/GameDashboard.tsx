@@ -12,6 +12,10 @@ import {
   BenefitType,
   IntellectualProperty,
   Lawyer,
+  ForeignMarket,
+  Subsidiary,
+  COUNTRIES,
+  LEGAL_STATUS_MODIFIERS,
 } from "@/types/game";
 import { 
   processDayTick, 
@@ -45,6 +49,8 @@ import { SupplyChainPanel } from "./SupplyChainPanel";
 import { HRAdvancedPanel } from "./HRAdvancedPanel";
 import { LegalPanel } from "./LegalPanel";
 import { GameplayPanel } from "./GameplayPanel";
+import { InternationalPanel } from "./InternationalPanel";
+import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   Wallet, 
   TrendingUp, 
@@ -70,6 +76,7 @@ import {
   GraduationCap,
   Scale,
   BarChart3,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -86,7 +93,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international';
 
 export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
@@ -659,6 +666,125 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     toast.success(`${newIP.name} enregistrée !`);
   }, [company.treasury, gameState.day]);
 
+  // ==================== INTERNATIONAL ACTIONS ====================
+  const handleEnterMarket = useCallback((countryId: string, strategy: 'export' | 'partnership' | 'subsidiary', investment: number) => {
+    const countryData = COUNTRIES[countryId as keyof typeof COUNTRIES];
+    if (!countryData) return;
+
+    const market: ForeignMarket = {
+      id: countryId,
+      country: countryData.name,
+      currency: countryData.currency,
+      exchangeRate: countryData.exchangeRate,
+      marketSize: countryData.marketSize,
+      penetration: 0,
+      entryBarrier: countryData.entryBarrier,
+      customsDuty: countryData.customsDuty,
+      taxRate: countryData.taxRate,
+      hasSubsidiary: false,
+      revenue: 0,
+    };
+
+    const result = enterMarket(market, strategy, investment, company);
+    
+    if (!result.success) {
+      toast.error(result.event);
+      setGameState(prev => ({
+        ...prev,
+        company: {
+          ...prev.company!,
+          treasury: prev.company!.treasury - result.cost,
+        },
+      }));
+      return;
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        treasury: prev.company!.treasury - result.cost,
+        foreignMarkets: [...prev.company!.foreignMarkets, result.market],
+      },
+    }));
+    toast.success(result.event);
+  }, [company]);
+
+  const handleCreateSubsidiary = useCallback((marketId: string, capital: number) => {
+    if (company.treasury < capital + 50000) {
+      toast.error("Trésorerie insuffisante");
+      return;
+    }
+
+    const market = company.foreignMarkets.find(m => m.id === marketId);
+    if (!market) return;
+
+    const subsidiary = createSubsidiary(market, capital);
+
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        treasury: prev.company!.treasury - capital - 50000,
+        foreignMarkets: prev.company!.foreignMarkets.map(m =>
+          m.id === marketId ? { ...m, hasSubsidiary: true } : m
+        ),
+        subsidiaries: [...prev.company!.subsidiaries, subsidiary],
+      },
+    }));
+    toast.success(`Filiale créée en ${market.country} !`);
+  }, [company.treasury, company.foreignMarkets]);
+
+  const handleInvestInMarket = useCallback((marketId: string, amount: number) => {
+    if (company.treasury < amount) {
+      toast.error("Trésorerie insuffisante");
+      return;
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        treasury: prev.company!.treasury - amount,
+        foreignMarkets: prev.company!.foreignMarkets.map(m =>
+          m.id === marketId ? { ...m, penetration: Math.min(30, m.penetration + 0.5) } : m
+        ),
+      },
+    }));
+    toast.success("Investissement effectué !");
+  }, [company.treasury]);
+
+  const handleInvestInSubsidiary = useCallback((subsidiaryId: string, amount: number) => {
+    if (company.treasury < amount) {
+      toast.error("Trésorerie insuffisante");
+      return;
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        treasury: prev.company!.treasury - amount,
+        subsidiaries: prev.company!.subsidiaries.map(s =>
+          s.id === subsidiaryId ? { ...s, treasury: s.treasury + amount } : s
+        ),
+      },
+    }));
+    toast.success("Capital transféré à la filiale !");
+  }, [company.treasury]);
+
+  const handleEnableProductExport = useCallback((productId: string) => {
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        products: prev.company!.products.map(p =>
+          p.id === productId ? { ...p, exportEnabled: !p.exportEnabled } : p
+        ),
+      },
+    }));
+  }, []);
+
   const handleSave = useCallback(() => {
     saveGame(gameState);
     toast.success("Partie sauvegardée !");
@@ -697,6 +823,8 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     );
   }
 
+  const canExport = LEGAL_STATUS_MODIFIERS[company.legalStatus].canExport;
+
   const tabs = [
     { id: 'overview', label: 'Aperçu', icon: TrendingUp },
     { id: 'banking', label: 'Banque', icon: Landmark },
@@ -705,6 +833,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'rh', label: 'RH', icon: Users },
     { id: 'hradvanced', label: 'RH Avancé', icon: GraduationCap },
     { id: 'products', label: 'Produits', icon: Package },
+    { id: 'international', label: 'International', icon: Globe },
     { id: 'legal', label: 'Juridique', icon: Scale },
     { id: 'taxes', label: 'Fiscalité', icon: FileText },
     { id: 'gameplay', label: 'Stats', icon: BarChart3 },
@@ -896,6 +1025,22 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                   {company.products.map(product => (<ProductCard key={product.id} product={product} onUpdatePrice={updateProductPrice} onUpdateMarketing={updateProductMarketing} />))}
                 </div>
               </div>
+            )}
+
+            {activeTab === 'international' && (
+              <InternationalPanel
+                foreignMarkets={company.foreignMarkets}
+                subsidiaries={company.subsidiaries}
+                exchangeRates={gameState.exchangeRates}
+                treasury={company.treasury}
+                companyReputation={company.reputation}
+                canExport={canExport}
+                onEnterMarket={handleEnterMarket}
+                onCreateSubsidiary={handleCreateSubsidiary}
+                onInvestInMarket={handleInvestInMarket}
+                onInvestInSubsidiary={handleInvestInSubsidiary}
+                onEnableProductExport={handleEnableProductExport}
+              />
             )}
 
             {activeTab === 'legal' && (
