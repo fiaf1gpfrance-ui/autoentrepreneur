@@ -56,6 +56,13 @@ export function createCompany(
     technologies: initializeTechnologies(),
     activeCrises: [],
     resolvedCrises: [],
+    // Currency system
+    coins: 100,
+    gems: 10,
+    lastDailyReward: 0,
+    dailyRewardStreak: 0,
+    purchasedItems: [],
+    activeBoosts: [],
   };
 }
 
