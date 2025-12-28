@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { GameState } from "@/types/game";
 import { createInitialState, loadGame, saveGame } from "@/utils/gameEngine";
-import { CompanySetup } from "@/components/game/CompanySetup";
+import { CompanySetup, GameSettings } from "@/components/game/CompanySetup";
 import { GameDashboard } from "@/components/game/GameDashboard";
 
 const Index = () => {
@@ -19,11 +19,15 @@ const Index = () => {
     setIsLoading(false);
   }, []);
 
-  const handleCompanyCreated = (company: GameState['company']) => {
+  const handleCompanyCreated = (company: GameState['company'], settings: GameSettings) => {
     const newState: GameState = {
       ...createInitialState(),
       company,
       isPaused: false,
+      difficulty: settings.difficulty === 'tutorial' ? 'facile' : 
+                  settings.difficulty === 'easy' ? 'facile' :
+                  settings.difficulty === 'hard' ? 'difficile' :
+                  settings.difficulty === 'hardcore' ? 'hardcore' : 'normal',
     };
     setGameState(newState);
     saveGame(newState);
