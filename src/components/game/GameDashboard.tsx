@@ -54,6 +54,9 @@ import { AchievementsPanel } from "./AchievementsPanel";
 import { MarketingPanel } from "./MarketingPanel";
 import { TechnologyPanel } from "./TechnologyPanel";
 import { CrisesPanel } from "./CrisesPanel";
+import { ShopPanel } from "./ShopPanel";
+import { ProgressionPanel } from "./ProgressionPanel";
+import { AdvancedInternationalPanel } from "./AdvancedInternationalPanel";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   Wallet, 
@@ -85,6 +88,9 @@ import {
   Megaphone,
   Cpu,
   AlertTriangle,
+  ShoppingCart,
+  Star,
+  Map,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -101,7 +107,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational';
 
 export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
