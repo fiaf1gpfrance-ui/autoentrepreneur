@@ -958,6 +958,8 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
 
   const tabs = [
     { id: 'overview', label: 'Aperçu', icon: TrendingUp },
+    { id: 'shop', label: 'Boutique', icon: ShoppingCart },
+    { id: 'progression', label: 'Progression', icon: Star },
     { id: 'achievements', label: 'Trophées', icon: Trophy },
     { id: 'marketing', label: 'Marketing', icon: Megaphone },
     { id: 'technology', label: 'R&D', icon: Cpu },
@@ -969,6 +971,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'hradvanced', label: 'RH Avancé', icon: GraduationCap },
     { id: 'products', label: 'Produits', icon: Package },
     { id: 'international', label: 'International', icon: Globe },
+    { id: 'advancedinternational', label: 'Mondial', icon: Map },
     { id: 'legal', label: 'Juridique', icon: Scale },
     { id: 'taxes', label: 'Fiscalité', icon: FileText },
     { id: 'gameplay', label: 'Stats', icon: BarChart3 },
@@ -1252,6 +1255,54 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                 achievements={company.achievements}
                 competitors={company.competitors}
                 marketShare={company.marketShare}
+              />
+            )}
+
+            {activeTab === 'shop' && (
+              <ShopPanel
+                treasury={company.treasury}
+                onPurchase={(itemId, cost, currency) => {
+                  toast.success(`Article acheté !`);
+                }}
+              />
+            )}
+
+            {activeTab === 'progression' && (
+              <ProgressionPanel
+                day={gameState.day}
+                stats={{
+                  totalRevenue: company.monthlyRevenue * gameState.month,
+                  totalProfit: company.treasury,
+                  employeesHired: company.employees.length,
+                  productsLaunched: company.products.length,
+                  countriesExpanded: company.foreignMarkets.length,
+                  achievementsUnlocked: company.achievements.filter(a => a.unlocked).length,
+                  totalPlayTime: gameState.day + (gameState.month - 1) * 30 + (gameState.year - 1) * 365,
+                  highestValuation: company.treasury + company.totalAssets,
+                  companiesCreated: 1,
+                  questsCompleted: 0,
+                  prestigeResets: 0,
+                }}
+              />
+            )}
+
+            {activeTab === 'advancedinternational' && (
+              <AdvancedInternationalPanel
+                treasury={company.treasury}
+                onInvest={(amount, country, mode) => {
+                  if (company.treasury >= amount) {
+                    setGameState(prev => ({
+                      ...prev,
+                      company: {
+                        ...prev.company!,
+                        treasury: prev.company!.treasury - amount,
+                      },
+                    }));
+                    toast.success(`Investissement de ${amount}€ en ${country} via ${mode} !`);
+                  } else {
+                    toast.error("Trésorerie insuffisante");
+                  }
+                }}
               />
             )}
           </div>
