@@ -502,6 +502,23 @@ export interface Company {
   technologies: TechnologyItem[];
   activeCrises: CrisisItem[];
   resolvedCrises: CrisisItem[];
+  // Currency system
+  coins: number;
+  gems: number;
+  lastDailyReward: number; // day number of last reward
+  dailyRewardStreak: number;
+  purchasedItems: string[]; // IDs of purchased shop items
+  activeBoosts: ActiveBoost[];
+}
+
+// Active boost from shop
+export interface ActiveBoost {
+  id: string;
+  itemId: string;
+  name: string;
+  type: 'revenue' | 'reputation' | 'productivity' | 'xp' | 'coins';
+  multiplier: number;
+  expiresAt: number; // day number
 }
 
 // Marketing Campaign for state

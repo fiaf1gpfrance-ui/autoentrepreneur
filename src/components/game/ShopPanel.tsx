@@ -14,7 +14,9 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 interface ShopPanelProps {
-  treasury: number;
+  coins: number;
+  gems: number;
+  purchasedItems: string[];
   onPurchase: (itemId: string, cost: number, currency: 'coins' | 'gems') => void;
 }
 
@@ -45,17 +47,17 @@ const rarityLabels: Record<ItemRarity, string> = {
   legendary: "Légendaire",
 };
 
-const createDefaultInventory = (): PlayerInventory => ({
-  coins: 5000,
-  gems: 50,
+const createDefaultInventory = (coins: number, gems: number, purchasedItems: string[]): PlayerInventory => ({
+  coins,
+  gems,
   prestigeTokens: 0,
-  items: [],
+  items: purchasedItems.map(id => ({ itemId: id, quantity: 1, purchaseDate: Date.now() })),
   activeBoosts: [],
 });
 
-export function ShopPanel({ treasury, onPurchase }: ShopPanelProps) {
+export function ShopPanel({ coins, gems, purchasedItems, onPurchase }: ShopPanelProps) {
   const [selectedCategory, setSelectedCategory] = useState<ItemCategory | 'all'>('all');
-  const [inventory, setInventory] = useState<PlayerInventory>(() => createDefaultInventory());
+  const [inventory, setInventory] = useState<PlayerInventory>(() => createDefaultInventory(coins, gems, purchasedItems));
   const [searchTerm, setSearchTerm] = useState("");
   
   const allItems = getShopItems();

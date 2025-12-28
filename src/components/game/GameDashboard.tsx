@@ -59,6 +59,13 @@ import { ProgressionPanel } from "./ProgressionPanel";
 import { AdvancedInternationalPanel } from "./AdvancedInternationalPanel";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
+  calculateDailyCoinGain, 
+  calculateWeeklyGemGain, 
+  canClaimDailyReward, 
+  claimDailyReward,
+  cleanExpiredBoosts,
+} from "@/utils/currencyEngine";
+import { 
   Wallet, 
   TrendingUp, 
   Users, 
@@ -91,6 +98,9 @@ import {
   ShoppingCart,
   Star,
   Map,
+  Coins,
+  Gem,
+  Gift,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -117,12 +127,34 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const weather = weatherConfig[gameState.economicWeather];
   const WeatherIcon = weather.icon;
 
-  // Game loop
+  // Game loop with currency gains
   useEffect(() => {
     if (gameState.isPaused || gameState.gameOver) return;
 
     const interval = setInterval(() => {
-      setGameState(prev => processDayTick(prev));
+      setGameState(prev => {
+        const newState = processDayTick(prev);
+        const company = newState.company!;
+        
+        // Daily coin gain
+        const coinGain = calculateDailyCoinGain(company);
+        
+        // Weekly gem gain
+        const gemGain = calculateWeeklyGemGain(company, newState);
+        
+        // Clean expired boosts
+        const activeBoosts = cleanExpiredBoosts(company, newState.day);
+        
+        return {
+          ...newState,
+          company: {
+            ...company,
+            coins: company.coins + coinGain,
+            gems: company.gems + gemGain,
+            activeBoosts,
+          },
+        };
+      });
     }, 2000 / gameState.gameSpeed);
 
     return () => clearInterval(interval);
@@ -150,6 +182,31 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
       activeEvents: prev.activeEvents.filter(e => e.id !== eventId),
     }));
   }, []);
+
+  // Daily reward claim
+  const claimDailyRewardAction = useCallback(() => {
+    if (!canClaimDailyReward(company, gameState.day)) {
+      toast.info("Récompense déjà réclamée aujourd'hui !");
+      return;
+    }
+    
+    const reward = claimDailyReward(company, gameState.day);
+    setGameState(prev => ({
+      ...prev,
+      company: {
+        ...prev.company!,
+        coins: prev.company!.coins + reward.coins,
+        gems: prev.company!.gems + reward.gems,
+        lastDailyReward: gameState.day,
+        dailyRewardStreak: reward.streak,
+      },
+    }));
+    
+    let message = `+${reward.coins} pièces`;
+    if (reward.gems > 0) message += `, +${reward.gems} gemmes`;
+    if (reward.special) message += ` - ${reward.special}`;
+    toast.success(message, { duration: 4000 });
+  }, [company, gameState.day]);
 
   // ==================== EMPLOYEE ACTIONS ====================
   const hireEmployee = useCallback(() => {
@@ -991,12 +1048,35 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 text-sm text-muted-foreground mr-4">
+            <div className="flex items-center gap-3">
+              {/* Currency display */}
+              <div className="flex items-center gap-1.5 bg-amber-500/20 px-2.5 py-1 rounded-full">
+                <Coins className="w-4 h-4 text-amber-400" />
+                <span className="font-bold text-amber-400 text-sm">{company.coins?.toLocaleString() || 0}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-purple-500/20 px-2.5 py-1 rounded-full">
+                <Gem className="w-4 h-4 text-purple-400" />
+                <span className="font-bold text-purple-400 text-sm">{company.gems || 0}</span>
+              </div>
+              
+              {/* Daily reward button */}
+              {canClaimDailyReward(company, gameState.day) && (
+                <button 
+                  onClick={claimDailyRewardAction}
+                  className="flex items-center gap-1.5 bg-success/20 hover:bg-success/30 px-2.5 py-1 rounded-full transition-colors animate-pulse"
+                >
+                  <Gift className="w-4 h-4 text-success" />
+                  <span className="font-bold text-success text-xs">Récompense!</span>
+                </button>
+              )}
+              
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
                 <span>J{gameState.day} M{gameState.month} A{gameState.year}</span>
               </div>
+            </div>
 
+            <div className="flex items-center gap-2">
               <button onClick={() => setSpeed(1)} className={cn("p-2 rounded-lg transition-colors", gameState.gameSpeed === 1 ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80")}>
                 <Play className="w-4 h-4" />
               </button>
@@ -1260,8 +1340,19 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
 
             {activeTab === 'shop' && (
               <ShopPanel
-                treasury={company.treasury}
+                coins={company.coins || 0}
+                gems={company.gems || 0}
+                purchasedItems={company.purchasedItems || []}
                 onPurchase={(itemId, cost, currency) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      coins: currency === 'coins' ? prev.company!.coins - cost : prev.company!.coins,
+                      gems: currency === 'gems' ? prev.company!.gems - cost : prev.company!.gems,
+                      purchasedItems: [...(prev.company!.purchasedItems || []), itemId],
+                    },
+                  }));
                   toast.success(`Article acheté !`);
                 }}
               />
