@@ -57,6 +57,9 @@ import { CrisesPanel } from "./CrisesPanel";
 import { ShopPanel } from "./ShopPanel";
 import { ProgressionPanel } from "./ProgressionPanel";
 import { AdvancedInternationalPanel } from "./AdvancedInternationalPanel";
+import { UltraFinancePanel } from "./UltraFinancePanel";
+import { AdvancedProductionPanel } from "./AdvancedProductionPanel";
+import { AdvancedCommercialPanel } from "./AdvancedCommercialPanel";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   calculateDailyCoinGain, 
