@@ -120,7 +120,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial';
 
 export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
@@ -1025,11 +1025,14 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'technology', label: 'R&D', icon: Cpu },
     { id: 'crises', label: 'Crises', icon: AlertTriangle },
     { id: 'banking', label: 'Banque', icon: Landmark },
+    { id: 'ultrafinance', label: 'Finance+', icon: Wallet },
     { id: 'realestate', label: 'Immobilier', icon: Building },
     { id: 'supply', label: 'Supply Chain', icon: Truck },
+    { id: 'advancedproduction', label: 'Production', icon: Package },
     { id: 'rh', label: 'RH', icon: Users },
     { id: 'hradvanced', label: 'RH Avancé', icon: GraduationCap },
     { id: 'products', label: 'Produits', icon: Package },
+    { id: 'advancedcommercial', label: 'Commercial', icon: ShoppingCart },
     { id: 'international', label: 'International', icon: Globe },
     { id: 'advancedinternational', label: 'Mondial', icon: Map },
     { id: 'legal', label: 'Juridique', icon: Scale },
@@ -1397,6 +1400,33 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                     toast.error("Trésorerie insuffisante");
                   }
                 }}
+              />
+            )}
+
+            {activeTab === 'ultrafinance' && (
+              <UltraFinancePanel
+                company={company}
+                day={gameState.day}
+                month={gameState.month}
+                year={gameState.year}
+              />
+            )}
+
+            {activeTab === 'advancedproduction' && (
+              <AdvancedProductionPanel
+                company={company}
+                onCreateProductionLine={(line) => toast.success(`Ligne ${line.name} créée !`)}
+                onScheduleMaintenance={(lineId) => toast.info(`Maintenance planifiée`)}
+                onOptimizeProcess={(type) => toast.success(`Optimisation ${type} lancée !`)}
+              />
+            )}
+
+            {activeTab === 'advancedcommercial' && (
+              <AdvancedCommercialPanel
+                company={company}
+                onContactClient={(clientId) => toast.success(`Client contacté !`)}
+                onCreateOpportunity={(clientId) => toast.success(`Opportunité créée !`)}
+                onAdvanceOpportunity={(oppId, stage) => toast.success(`Opportunité avancée à ${stage} !`)}
               />
             )}
           </div>
