@@ -547,11 +547,11 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Statut</span>
-                    <span className="font-medium">{legalStatusOptions.find(o => o.value === legalStatus)?.label}</span>
+                    <span className="font-medium">{legalStatus ? legalStatusOptions.find(o => o.value === legalStatus)?.label : '-'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Secteur</span>
-                    <span className="font-medium">{sectorOptions.find(o => o.value === sector)?.label}</span>
+                    <span className="font-medium">{sector ? sectorOptions.find(o => o.value === sector)?.label : '-'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Siège</span>
