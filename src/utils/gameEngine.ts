@@ -13,6 +13,7 @@ import {
   ContractType,
   EventCategory
 } from '@/types/game';
+import { createInitialBankAccount } from './bankingEngine';
 
 // Calculate super-brut (total employer cost)
 export function calculateSuperBrut(brutSalary: number): number {
@@ -500,12 +501,55 @@ export function loadGame(): GameState | null {
   const saved = localStorage.getItem('simu_entrepreneur_save');
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Migrate old saves: ensure company has all required fields
+      if (parsed.company) {
+        parsed.company = migrateCompany(parsed.company);
+      }
+      return parsed;
     } catch {
       return null;
     }
   }
   return null;
+}
+
+// Migrate old company data to ensure all fields exist
+function migrateCompany(company: Partial<Company>): Company {
+  return {
+    ...company,
+    technologies: company.technologies ?? [],
+    marketingCampaigns: company.marketingCampaigns ?? [],
+    activeCrises: company.activeCrises ?? [],
+    resolvedCrises: company.resolvedCrises ?? [],
+    coins: company.coins ?? 100,
+    gems: company.gems ?? 10,
+    lastDailyReward: company.lastDailyReward ?? 0,
+    dailyRewardStreak: company.dailyRewardStreak ?? 0,
+    purchasedItems: company.purchasedItems ?? [],
+    activeBoosts: company.activeBoosts ?? [],
+    bankAccount: company.bankAccount ?? createInitialBankAccount(),
+    properties: company.properties ?? [],
+    suppliers: company.suppliers ?? [],
+    inventory: company.inventory ?? [],
+    clients: company.clients ?? [],
+    invoices: company.invoices ?? [],
+    legalCases: company.legalCases ?? [],
+    lawyers: company.lawyers ?? [],
+    intellectualProperty: company.intellectualProperty ?? [],
+    socialBenefits: company.socialBenefits ?? [],
+    unions: company.unions ?? [],
+    foreignMarkets: company.foreignMarkets ?? [],
+    subsidiaries: company.subsidiaries ?? [],
+    achievements: company.achievements ?? [],
+    missions: company.missions ?? [],
+    competitors: company.competitors ?? [],
+    marketShare: company.marketShare ?? 5,
+    reputation: company.reputation ?? 50,
+    innovationScore: company.innovationScore ?? 50,
+    totalAssets: company.totalAssets ?? company.capital ?? 0,
+    totalLiabilities: company.totalLiabilities ?? 0,
+  } as Company;
 }
 
 // Create initial game state
