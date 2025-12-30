@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Company, LegalStatus, Sector, LEGAL_STATUS_MODIFIERS } from "@/types/game";
+import { LEGAL_STRUCTURES, LegalStructureType, LegalStructure } from "@/types/legalStructures";
 import { formatCurrency, generateEmployee } from "@/utils/gameEngine";
 import { createCompany } from "@/utils/companyFactory";
 import { 
   Building2, Scale, Factory, Cpu, Wrench, HeadphonesIcon, Cog,
   MapPin, User, Target, Zap, Shield, TrendingUp, Globe, Briefcase,
   GraduationCap, Heart, Star, Coins, Clock, Trophy, Rocket, Crown,
-  Lightbulb, Users, Handshake, Leaf, Flame, Sparkles, Gift
+  Lightbulb, Users, Handshake, Leaf, Flame, Sparkles, Gift, Building,
+  Landmark, Home, ChevronDown, ChevronUp, Info, Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +23,7 @@ export interface GameSettings {
   location: Location;
   startingBonus: StartingBonus;
   objective: GameObjective;
+  legalStructure: LegalStructureType;
 }
 
 type Difficulty = 'tutorial' | 'easy' | 'normal' | 'hard' | 'hardcore';
@@ -29,6 +32,49 @@ type FounderType = 'visionary' | 'manager' | 'technical' | 'commercial' | 'finan
 type Location = 'paris' | 'lyon' | 'marseille' | 'bordeaux' | 'lille' | 'nantes' | 'toulouse' | 'strasbourg';
 type StartingBonus = 'none' | 'extra_cash' | 'skilled_team' | 'reputation' | 'technology' | 'contacts' | 'lucky';
 type GameObjective = 'millionaire' | 'empire' | 'innovation' | 'social' | 'international' | 'legacy' | 'freedom';
+
+// Simplified mapping for game mechanics (uses 3 basic statuses internally)
+const legalStatusMapping: Record<LegalStructureType, LegalStatus> = {
+  'auto_entrepreneur': 'auto-entrepreneur',
+  'ei': 'auto-entrepreneur',
+  'eirl': 'auto-entrepreneur',
+  'eurl': 'sarl',
+  'sarl': 'sarl',
+  'sarl_famille': 'sarl',
+  'sas': 'sas',
+  'sasu': 'sas',
+  'sa': 'sas',
+  'snc': 'sarl',
+  'scs': 'sarl',
+  'sca': 'sas',
+  'sel': 'sarl',
+  'selarl': 'sarl',
+  'selas': 'sas',
+  'scop': 'sarl',
+  'scic': 'sarl',
+  'association': 'auto-entrepreneur',
+  'association_rip': 'auto-entrepreneur',
+  'fondation': 'sas',
+  'mutuelle': 'sarl',
+  'gie': 'sarl',
+  'geie': 'sas',
+  'sci': 'sarl',
+  'scm': 'sarl',
+  'scp': 'sarl',
+  'holding': 'sas',
+  'se': 'sas',
+  'sne': 'sas',
+};
+
+// Group structures by category for better UX
+const structuresByCategory = {
+  individual: { label: 'Entreprises Individuelles', icon: User, structures: ['auto_entrepreneur', 'ei', 'eirl'] as LegalStructureType[] },
+  commercial: { label: 'Sociétés Commerciales', icon: Building, structures: ['eurl', 'sarl', 'sarl_famille', 'sas', 'sasu', 'sa', 'snc', 'scs', 'sca'] as LegalStructureType[] },
+  liberal: { label: 'Professions Libérales', icon: Briefcase, structures: ['sel', 'selarl', 'selas'] as LegalStructureType[] },
+  social: { label: 'Économie Sociale', icon: Heart, structures: ['scop', 'scic', 'association', 'association_rip', 'fondation', 'mutuelle'] as LegalStructureType[] },
+  civil: { label: 'Sociétés Civiles', icon: Home, structures: ['sci', 'scm', 'scp'] as LegalStructureType[] },
+  special: { label: 'Formes Spéciales', icon: Globe, structures: ['gie', 'geie', 'holding', 'se', 'sne'] as LegalStructureType[] },
+};
 
 const legalStatusOptions: { value: LegalStatus; label: string; description: string; icon: typeof Building2 }[] = [
   {

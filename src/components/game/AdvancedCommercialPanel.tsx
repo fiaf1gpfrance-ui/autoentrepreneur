@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Company, Client, ClientContract, Competitor, Product } from "@/types/game";
+import { Company, Client, ClientContract, Competitor } from "@/types/game";
+import { Salesperson, SALESPERSON_CATALOG, SalesTeam, CRMClient, Opportunity } from "@/types/commercial";
 import { formatCurrency } from "@/utils/gameEngine";
 import { GaugeBar } from "./GaugeBar";
 import { 
@@ -24,25 +25,26 @@ import {
   Filter,
   Eye,
   MessageSquare,
-  FileText
+  FileText,
+  Plus,
+  UserPlus,
+  Megaphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AdvancedCommercialPanelProps {
   company: Company;
+  salesTeam?: SalesTeam[];
+  opportunities?: Opportunity[];
+  onHireSalesperson?: (salesperson: Salesperson) => void;
+  onLaunchCampaign?: (type: string, budget: number) => void;
   onContactClient?: (clientId: string) => void;
   onCreateOpportunity?: (clientId: string) => void;
   onAdvanceOpportunity?: (oppId: string, stage: string) => void;
+  onAddProspect?: (prospect: CRMClient) => void;
 }
 
-// Mock CRM data
-const mockOpportunities = [
-  { id: 'opp1', name: 'Contrat Enterprise ABC', client: 'TechCorp SA', value: 150000, stage: 'negotiation', probability: 75, daysOpen: 45, nextAction: 'Présentation finale' },
-  { id: 'opp2', name: 'Renouvellement Premium', client: 'GlobalRetail', value: 85000, stage: 'proposal', probability: 60, daysOpen: 28, nextAction: 'Envoi devis révisé' },
-  { id: 'opp3', name: 'Extension Services', client: 'FinanceFirst', value: 220000, stage: 'qualification', probability: 40, daysOpen: 12, nextAction: 'RDV découverte' },
-  { id: 'opp4', name: 'POC Innovation', client: 'StartupXYZ', value: 35000, stage: 'demo', probability: 55, daysOpen: 20, nextAction: 'Demo technique' },
-];
-
+// Pipeline stages
 const pipelineStages = [
   { id: 'qualification', name: 'Qualification', color: 'bg-blue-500' },
   { id: 'demo', name: 'Démonstration', color: 'bg-purple-500' },
@@ -51,16 +53,44 @@ const pipelineStages = [
   { id: 'closing', name: 'Closing', color: 'bg-green-500' },
 ];
 
-export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCommercialPanelProps) {
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'clients' | 'forecast' | 'competition' | 'activity' | 'kpi'>('pipeline');
+// Campaign types with costs
+const campaignTypes = [
+  { id: 'email', name: 'Email Marketing', baseCost: 500, expectedROI: 3.5, duration: 7 },
+  { id: 'social', name: 'Réseaux Sociaux', baseCost: 1000, expectedROI: 2.8, duration: 14 },
+  { id: 'ads', name: 'Publicité Digitale', baseCost: 2000, expectedROI: 4.2, duration: 30 },
+  { id: 'event', name: 'Événement', baseCost: 5000, expectedROI: 5.0, duration: 1 },
+  { id: 'pr', name: 'Relations Presse', baseCost: 3000, expectedROI: 2.5, duration: 60 },
+  { id: 'referral', name: 'Programme Parrainage', baseCost: 1500, expectedROI: 6.0, duration: 90 },
+];
+
+export function AdvancedCommercialPanel({ 
+  company, 
+  salesTeam = [],
+  opportunities = [],
+  onHireSalesperson,
+  onLaunchCampaign,
+  onContactClient,
+  onCreateOpportunity,
+  onAddProspect
+}: AdvancedCommercialPanelProps) {
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'team' | 'clients' | 'campaigns' | 'competition' | 'kpi'>('pipeline');
   const [selectedStage, setSelectedStage] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  // Mock opportunities if none provided
+  const mockOpportunities = opportunities.length > 0 ? opportunities : [
+    { id: 'opp1', name: 'Contrat Enterprise ABC', clientId: 'c1', value: 150000, stage: 'negotiation' as const, probability: 75, createdAt: Date.now() - 45 * 24 * 60 * 60 * 1000, expectedCloseDate: Date.now() + 30 * 24 * 60 * 60 * 1000, assignedTo: 'sales1', notes: [], activities: [] },
+    { id: 'opp2', name: 'Renouvellement Premium', clientId: 'c2', value: 85000, stage: 'proposal' as const, probability: 60, createdAt: Date.now() - 28 * 24 * 60 * 60 * 1000, expectedCloseDate: Date.now() + 45 * 24 * 60 * 60 * 1000, assignedTo: 'sales2', notes: [], activities: [] },
+    { id: 'opp3', name: 'Extension Services', clientId: 'c3', value: 220000, stage: 'qualification' as const, probability: 40, createdAt: Date.now() - 12 * 24 * 60 * 60 * 1000, expectedCloseDate: Date.now() + 60 * 24 * 60 * 60 * 1000, assignedTo: 'sales1', notes: [], activities: [] },
+    { id: 'opp4', name: 'POC Innovation', clientId: 'c4', value: 35000, stage: 'demo' as const, probability: 55, createdAt: Date.now() - 20 * 24 * 60 * 60 * 1000, expectedCloseDate: Date.now() + 20 * 24 * 60 * 60 * 1000, assignedTo: 'sales3', notes: [], activities: [] },
+  ];
 
   // Calculate metrics
   const totalPipelineValue = mockOpportunities.reduce((sum, o) => sum + o.value, 0);
   const weightedPipeline = mockOpportunities.reduce((sum, o) => sum + o.value * (o.probability / 100), 0);
-  const avgDealSize = totalPipelineValue / mockOpportunities.length;
-  const conversionRate = 32; // Mock
-  const avgSalesCycle = 45; // Mock days
+  const avgDealSize = totalPipelineValue / Math.max(mockOpportunities.length, 1);
+  const conversionRate = 32;
+  const avgSalesCycle = 45;
 
   // Client metrics
   const totalClients = company.clients.length;
@@ -70,12 +100,15 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
     ? company.clients.reduce((sum, c) => sum + c.relationshipScore, 0) / company.clients.length 
     : 0;
 
+  // Salesperson categories
+  const salespersonCategories = [...new Set(SALESPERSON_CATALOG.map(s => s.specialty))];
+
   const tabs = [
     { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
-    { id: 'clients', label: 'Clients', icon: Users },
-    { id: 'forecast', label: 'Prévisions', icon: Target },
+    { id: 'team', label: 'Équipe', icon: Users },
+    { id: 'clients', label: 'Clients', icon: Briefcase },
+    { id: 'campaigns', label: 'Campagnes', icon: Megaphone },
     { id: 'competition', label: 'Concurrence', icon: Eye },
-    { id: 'activity', label: 'Activités', icon: Calendar },
     { id: 'kpi', label: 'KPIs', icon: BarChart3 },
   ];
 
@@ -135,7 +168,6 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
       {/* Pipeline Tab */}
       {activeTab === 'pipeline' && (
         <div className="space-y-4">
-          {/* Pipeline Stages */}
           <div className="game-panel">
             <h4 className="font-display font-semibold mb-4">Pipeline Commercial</h4>
             <div className="flex gap-2 mb-4">
@@ -165,33 +197,137 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
             <div className="space-y-2">
               {mockOpportunities
                 .filter(o => !selectedStage || o.stage === selectedStage)
-                .map(opp => (
-                <div key={opp.id} className="bg-secondary/30 rounded-lg p-3 flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium">{opp.name}</p>
-                      <span className={cn(
-                        "px-2 py-0.5 rounded-full text-xs",
-                        pipelineStages.find(s => s.id === opp.stage)?.color.replace('bg-', 'bg-') + '/20',
-                        pipelineStages.find(s => s.id === opp.stage)?.color.replace('bg-', 'text-').replace('-500', '-400')
-                      )}>
-                        {pipelineStages.find(s => s.id === opp.stage)?.name}
-                      </span>
+                .map(opp => {
+                  const daysOpen = Math.floor((Date.now() - opp.createdAt) / (24 * 60 * 60 * 1000));
+                  const stage = pipelineStages.find(s => s.id === opp.stage);
+                  return (
+                    <div key={opp.id} className="bg-secondary/30 rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium">{opp.name}</p>
+                          <span className={cn(
+                            "px-2 py-0.5 rounded-full text-xs",
+                            stage?.color.replace('bg-', 'bg-') + '/20'
+                          )}>
+                            {stage?.name}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{daysOpen} jours</p>
+                      </div>
+                      <div className="text-right mr-4">
+                        <p className="font-bold text-success">{formatCurrency(opp.value)}</p>
+                        <p className="text-xs text-muted-foreground">{opp.probability}% probabilité</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="p-2 rounded-lg bg-secondary hover:bg-secondary/80">
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground">{opp.client} • {opp.daysOpen} jours</p>
+                  );
+                })}
+            </div>
+          </div>
+
+          <button 
+            onClick={() => {
+              const newProspect: CRMClient = {
+                id: `prospect_${Date.now()}`,
+                name: `Prospect ${Date.now()}`,
+                company: 'Nouvelle entreprise',
+                email: 'contact@example.com',
+                phone: '+33 1 00 00 00 00',
+                status: 'prospect',
+                source: 'direct',
+                score: 50,
+                createdAt: Date.now(),
+                lastContact: Date.now(),
+                interactions: [],
+                tags: []
+              };
+              onAddProspect?.(newProspect);
+            }}
+            className="w-full btn-game-primary flex items-center justify-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> Ajouter un prospect
+          </button>
+        </div>
+      )}
+
+      {/* Sales Team Tab */}
+      {activeTab === 'team' && (
+        <div className="space-y-4">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs transition-colors",
+                selectedCategory === 'all' ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
+              )}
+            >
+              Tous
+            </button>
+            {salespersonCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs transition-colors capitalize",
+                  selectedCategory === cat ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
+                )}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {SALESPERSON_CATALOG
+              .filter(sp => selectedCategory === 'all' || sp.specialty === selectedCategory)
+              .map(salesperson => (
+              <div key={salesperson.id} className="game-panel">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h4 className="font-display font-semibold">{salesperson.name}</h4>
+                    <p className="text-xs text-muted-foreground capitalize">{salesperson.specialty}</p>
                   </div>
-                  <div className="text-right mr-4">
-                    <p className="font-bold text-success">{formatCurrency(opp.value)}</p>
-                    <p className="text-xs text-muted-foreground">{opp.probability}% probabilité</p>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-xs",
+                    salesperson.level === 'senior' ? "bg-purple-500/20 text-purple-400" :
+                    salesperson.level === 'confirmed' ? "bg-info/20 text-info" :
+                    "bg-muted text-muted-foreground"
+                  )}>
+                    {salesperson.level}
+                  </span>
+                </div>
+                
+                <div className="space-y-2 text-xs mb-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Compétences</span>
+                    <span className="font-medium">{salesperson.skills}/100</span>
                   </div>
-                  <div className="flex gap-2">
-                    <button className="p-2 rounded-lg bg-secondary hover:bg-secondary/80">
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Négociation</span>
+                    <span className="font-medium text-success">+{salesperson.negotiationBonus}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Closing</span>
+                    <span className="font-medium text-primary">+{salesperson.closingBonus}%</span>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-lg">{formatCurrency(salesperson.salary)}/mois</span>
+                  <button
+                    onClick={() => onHireSalesperson?.(salesperson)}
+                    disabled={company.treasury < salesperson.hiringCost}
+                    className="btn-game-primary text-xs py-1.5 px-4 disabled:opacity-50"
+                  >
+                    <UserPlus className="w-3 h-3 mr-1 inline" /> Recruter ({formatCurrency(salesperson.hiringCost)})
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -225,14 +361,13 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
                   <th className="text-right py-2">CA Total</th>
                   <th className="text-center py-2">Contrats</th>
                   <th className="text-center py-2">Relation</th>
-                  <th className="text-center py-2">Dernier Contact</th>
                   <th className="text-center py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {company.clients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <td colSpan={6} className="text-center py-8 text-muted-foreground">
                       <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
                       Aucun client enregistré
                     </td>
@@ -260,16 +395,20 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
                       <td className="text-center py-3">{client.contracts.length}</td>
                       <td className="text-center py-3">
                         <div className="flex items-center justify-center gap-1">
-                          <GaugeBar value={client.relationshipScore} label="" colorClass={client.relationshipScore >= 70 ? "bg-success" : "bg-warning"} />
+                          <div className="w-16">
+                            <GaugeBar value={client.relationshipScore} label="" colorClass={client.relationshipScore >= 70 ? "bg-success" : "bg-warning"} />
+                          </div>
                           <span className="text-xs">{client.relationshipScore}%</span>
                         </div>
                       </td>
-                      <td className="text-center py-3 text-xs text-muted-foreground">
-                        {Math.floor(Math.random() * 30)} jours
-                      </td>
                       <td className="text-center py-3">
                         <div className="flex justify-center gap-1">
-                          <button className="p-1.5 rounded bg-secondary hover:bg-secondary/80"><Phone className="w-3 h-3" /></button>
+                          <button 
+                            onClick={() => onContactClient?.(client.id)}
+                            className="p-1.5 rounded bg-secondary hover:bg-secondary/80"
+                          >
+                            <Phone className="w-3 h-3" />
+                          </button>
                           <button className="p-1.5 rounded bg-secondary hover:bg-secondary/80"><Mail className="w-3 h-3" /></button>
                           <button className="p-1.5 rounded bg-secondary hover:bg-secondary/80"><FileText className="w-3 h-3" /></button>
                         </div>
@@ -283,69 +422,68 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
         </div>
       )}
 
-      {/* Forecast Tab */}
-      {activeTab === 'forecast' && (
+      {/* Campaigns Tab */}
+      {activeTab === 'campaigns' && (
         <div className="space-y-4">
           <div className="game-panel">
-            <h4 className="font-display font-semibold mb-4">Prévisions de Ventes</h4>
-            <div className="grid grid-cols-4 gap-4 mb-6">
-              {['Best Case', 'Commit', 'Expected', 'Worst Case'].map((scenario, i) => {
-                const values = [totalPipelineValue * 0.9, weightedPipeline * 1.1, weightedPipeline, weightedPipeline * 0.7];
-                return (
-                  <div key={scenario} className="bg-secondary/50 rounded-lg p-4 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">{scenario}</p>
-                    <p className={cn(
-                      "text-xl font-bold",
-                      i === 0 ? "text-success" : i === 3 ? "text-destructive" : "text-foreground"
-                    )}>
-                      {formatCurrency(values[i])}
-                    </p>
+            <h4 className="font-display font-semibold mb-4 flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-primary" /> Lancer une campagne
+            </h4>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              {campaignTypes.map(campaign => (
+                <div key={campaign.id} className="bg-secondary/50 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium">{campaign.name}</p>
+                      <p className="text-xs text-muted-foreground">Durée: {campaign.duration} jours</p>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                  
+                  <div className="space-y-2 text-xs mb-3">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Coût minimum</span>
+                      <span className="font-medium">{formatCurrency(campaign.baseCost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ROI attendu</span>
+                      <span className="font-medium text-success">x{campaign.expectedROI}</span>
+                    </div>
+                  </div>
 
-            <div className="bg-primary/10 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <h5 className="font-medium">Objectif Trimestriel</h5>
-                  <p className="text-xs text-muted-foreground">Q{Math.ceil((new Date().getMonth() + 1) / 3)} 2024</p>
+                  <button
+                    onClick={() => onLaunchCampaign?.(campaign.id, campaign.baseCost)}
+                    disabled={company.treasury < campaign.baseCost}
+                    className="w-full btn-game-primary text-xs py-1.5 disabled:opacity-50"
+                  >
+                    Lancer ({formatCurrency(campaign.baseCost)})
+                  </button>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold">{formatCurrency(totalClientRevenue)}</p>
-                  <p className="text-xs text-muted-foreground">sur {formatCurrency(500000)} objectif</p>
-                </div>
-              </div>
-              <GaugeBar value={Math.min(100, (totalClientRevenue / 500000) * 100)} label="" colorClass="bg-primary" />
-              <p className="text-xs text-muted-foreground mt-2">
-                {((totalClientRevenue / 500000) * 100).toFixed(1)}% de l'objectif atteint
-              </p>
+              ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="game-panel">
-              <h4 className="font-display font-semibold mb-3">Par Produit</h4>
-              <div className="space-y-2">
-                {company.products.slice(0, 5).map(product => (
-                  <div key={product.id} className="flex justify-between items-center">
-                    <span className="text-sm">{product.name}</span>
-                    <span className="font-medium">{formatCurrency(product.salesVolume * product.currentPrice * 30)}</span>
+          <div className="game-panel">
+            <h4 className="font-display font-semibold mb-4">Campagnes actives</h4>
+            {company.marketingCampaigns.filter(c => c.active).length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Aucune campagne active</p>
+            ) : (
+              <div className="space-y-3">
+                {company.marketingCampaigns.filter(c => c.active).map(campaign => (
+                  <div key={campaign.id} className="bg-secondary/30 rounded-lg p-3 flex justify-between items-center">
+                    <div>
+                      <p className="font-medium">{campaign.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Budget: {formatCurrency(campaign.budget)} | Reach: {campaign.reach.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-success">ROI: {(campaign.roi * 100).toFixed(0)}%</p>
+                      <p className="text-xs text-muted-foreground">{campaign.conversions} conversions</p>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="game-panel">
-              <h4 className="font-display font-semibold mb-3">Par Segment</h4>
-              <div className="space-y-2">
-                {['Grand Compte', 'PME', 'TPE', 'Particulier', 'Public'].map((segment, i) => (
-                  <div key={segment} className="flex justify-between items-center">
-                    <span className="text-sm">{segment}</span>
-                    <span className="font-medium">{formatCurrency([120000, 85000, 45000, 20000, 30000][i])}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -375,7 +513,7 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Innovation</p>
-                      <GaugeBar value={competitor.innovation} label="" colorClass="bg-primary" />
+                      <GaugeBar value={competitor.innovation} label="" colorClass="bg-info" />
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Réputation</p>
@@ -383,82 +521,12 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
                     </div>
                   </div>
 
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Prix: {competitor.priceLevel > 1 ? '+' : ''}{((competitor.priceLevel - 1) * 100).toFixed(0)}% vs nous</span>
-                    <span className="text-muted-foreground">{competitor.products.length} produits</span>
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Prix: {competitor.priceLevel > 1 ? 'Plus cher' : competitor.priceLevel < 1 ? 'Moins cher' : 'Similaire'} ({(competitor.priceLevel * 100 - 100).toFixed(0)}%)
+                  </p>
                 </div>
               ))}
             </div>
-
-            {company.competitors.length === 0 && (
-              <div className="text-center py-8">
-                <Eye className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                <p className="text-muted-foreground">Aucun concurrent identifié</p>
-              </div>
-            )}
-          </div>
-
-          <div className="game-panel">
-            <h4 className="font-display font-semibold mb-4">Positionnement Prix</h4>
-            <div className="flex items-end justify-around h-32 bg-secondary/30 rounded-lg p-4">
-              {[...company.competitors.slice(0, 3), { name: 'Vous', priceLevel: 1, marketShare: company.marketShare }].map((c, i) => (
-                <div key={i} className="text-center">
-                  <div 
-                    className={cn(
-                      "w-16 rounded-t-lg mx-auto mb-2",
-                      c.name === 'Vous' ? "bg-primary" : "bg-muted"
-                    )}
-                    style={{ height: `${Math.max(20, c.marketShare * 2)}px` }}
-                  />
-                  <p className="text-xs font-medium">{c.name}</p>
-                  <p className="text-xs text-muted-foreground">{c.marketShare}%</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Activity Tab */}
-      {activeTab === 'activity' && (
-        <div className="game-panel">
-          <h4 className="font-display font-semibold mb-4 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-info" /> Activités Commerciales
-          </h4>
-          <div className="space-y-3">
-            {[
-              { type: 'call', title: 'Appel TechCorp SA', time: 'Aujourd\'hui 14h00', status: 'scheduled' },
-              { type: 'meeting', title: 'RDV GlobalRetail - Négociation', time: 'Demain 10h00', status: 'scheduled' },
-              { type: 'email', title: 'Relance FinanceFirst', time: 'Hier', status: 'completed' },
-              { type: 'demo', title: 'Demo StartupXYZ', time: 'Dans 3 jours', status: 'scheduled' },
-              { type: 'call', title: 'Appel suivi prospect', time: 'Il y a 2 jours', status: 'completed' },
-            ].map((activity, i) => (
-              <div key={i} className="flex items-center gap-4 bg-secondary/30 rounded-lg p-3">
-                <div className={cn(
-                  "p-2 rounded-lg",
-                  activity.type === 'call' ? "bg-blue-500/20" :
-                  activity.type === 'meeting' ? "bg-purple-500/20" :
-                  activity.type === 'email' ? "bg-green-500/20" :
-                  "bg-amber-500/20"
-                )}>
-                  {activity.type === 'call' ? <Phone className="w-4 h-4 text-blue-400" /> :
-                   activity.type === 'meeting' ? <Users className="w-4 h-4 text-purple-400" /> :
-                   activity.type === 'email' ? <Mail className="w-4 h-4 text-green-400" /> :
-                   <Eye className="w-4 h-4 text-amber-400" />}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{activity.title}</p>
-                  <p className="text-xs text-muted-foreground">{activity.time}</p>
-                </div>
-                <span className={cn(
-                  "px-2 py-0.5 rounded-full text-xs",
-                  activity.status === 'completed' ? "bg-success/20 text-success" : "bg-info/20 text-info"
-                )}>
-                  {activity.status === 'completed' ? 'Terminé' : 'Planifié'}
-                </span>
-              </div>
-            ))}
           </div>
         </div>
       )}
@@ -466,37 +534,28 @@ export function AdvancedCommercialPanel({ company, onContactClient }: AdvancedCo
       {/* KPIs Tab */}
       {activeTab === 'kpi' && (
         <div className="game-panel">
-          <h4 className="font-display font-semibold mb-4">Indicateurs Commerciaux</h4>
+          <h4 className="font-display font-semibold mb-4">Indicateurs de Performance Commerciale</h4>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { name: 'Taux de conversion', value: conversionRate, target: 35, unit: '%', trend: 'up' },
-              { name: 'Cycle de vente', value: avgSalesCycle, target: 40, unit: 'j', trend: 'down' },
-              { name: 'Panier moyen', value: avgDealSize, target: 50000, unit: '€', trend: 'up' },
-              { name: 'Vélocité pipeline', value: 125000, target: 100000, unit: '€/mois', trend: 'up' },
-              { name: 'NPS Clients', value: 45, target: 50, unit: '', trend: 'stable' },
-              { name: 'Taux rétention', value: 92, target: 90, unit: '%', trend: 'up' },
-              { name: 'CAC', value: 2500, target: 2000, unit: '€', trend: 'down' },
-              { name: 'LTV/CAC', value: 4.2, target: 5, unit: 'x', trend: 'up' },
-            ].map(kpi => {
-              const isGood = kpi.name === 'Cycle de vente' || kpi.name === 'CAC' 
-                ? kpi.value <= kpi.target 
-                : kpi.value >= kpi.target;
-              return (
-                <div key={kpi.name} className="bg-secondary/50 rounded-lg p-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-xs text-muted-foreground">{kpi.name}</p>
-                    {kpi.trend === 'up' ? <TrendingUp className="w-4 h-4 text-success" /> :
-                     kpi.trend === 'down' ? <TrendingUp className="w-4 h-4 text-destructive rotate-180" /> :
-                     <div className="w-4 h-0.5 bg-muted-foreground rounded" />}
-                  </div>
-                  <p className={cn("text-xl font-bold", isGood ? "text-success" : "text-warning")}>
-                    {typeof kpi.value === 'number' && kpi.unit === '€' ? formatCurrency(kpi.value) :
-                     typeof kpi.value === 'number' ? kpi.value.toLocaleString() : kpi.value}{kpi.unit !== '€' ? kpi.unit : ''}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Cible: {kpi.unit === '€' ? formatCurrency(kpi.target) : kpi.target}{kpi.unit !== '€' ? kpi.unit : ''}</p>
-                </div>
-              );
-            })}
+              { name: 'Pipeline Total', value: totalPipelineValue, format: 'currency' },
+              { name: 'Pipeline Pondéré', value: weightedPipeline, format: 'currency' },
+              { name: 'Deal Moyen', value: avgDealSize, format: 'currency' },
+              { name: 'Taux Conversion', value: conversionRate, format: 'percent' },
+              { name: 'Cycle Vente', value: avgSalesCycle, format: 'days' },
+              { name: 'Clients Actifs', value: totalClients, format: 'number' },
+              { name: 'CA Clients', value: totalClientRevenue, format: 'currency' },
+              { name: 'Score Relation Moy.', value: avgClientScore, format: 'percent' },
+            ].map(kpi => (
+              <div key={kpi.name} className="bg-secondary/50 rounded-lg p-4">
+                <p className="text-xs text-muted-foreground mb-1">{kpi.name}</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {kpi.format === 'currency' ? formatCurrency(kpi.value) :
+                   kpi.format === 'percent' ? `${kpi.value.toFixed(0)}%` :
+                   kpi.format === 'days' ? `${kpi.value}j` :
+                   kpi.value}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       )}

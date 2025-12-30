@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Company, Product, Supplier, InventoryItem } from "@/types/game";
+import { Company, Product } from "@/types/game";
+import { ProductionEquipment, EQUIPMENT_CATALOG, ProductionLine } from "@/types/production";
 import { formatCurrency } from "@/utils/gameEngine";
 import { GaugeBar } from "./GaugeBar";
 import { 
@@ -20,61 +21,76 @@ import {
   Award,
   RefreshCw,
   Gauge,
-  Timer
+  Timer,
+  Plus,
+  ShoppingCart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AdvancedProductionPanelProps {
   company: Company;
-  onCreateProductionLine?: (line: any) => void;
+  productionLines?: ProductionLine[];
+  onBuyEquipment?: (equipment: ProductionEquipment) => void;
   onScheduleMaintenance?: (lineId: string) => void;
   onOptimizeProcess?: (type: string) => void;
+  onAddProductionLine?: (line: ProductionLine) => void;
+  onStartCertification?: (certId: string, cost: number) => void;
 }
 
-// Mock production data
-const generateProductionLines = (products: Product[]) => [
-  { id: 'line1', name: 'Ligne Alpha', type: 'semi_auto', capacity: 100, currentOutput: 78, efficiency: 82, maintenanceLevel: 75, status: 'running', products: products.slice(0, 1).map(p => p.id) },
-  { id: 'line2', name: 'Ligne Beta', type: 'automated', capacity: 200, currentOutput: 165, efficiency: 88, maintenanceLevel: 90, status: 'running', products: products.slice(0, 2).map(p => p.id) },
-  { id: 'line3', name: 'Ligne Gamma', type: 'manual', capacity: 50, currentOutput: 35, efficiency: 70, maintenanceLevel: 45, status: 'maintenance', products: [] },
-];
-
+// Quality certifications with realistic costs
 const qualityCertifications = [
-  { id: 'iso9001', name: 'ISO 9001', description: 'Management qualité', status: 'certified', nextAudit: 90, cost: 15000 },
-  { id: 'iso14001', name: 'ISO 14001', description: 'Management environnemental', status: 'in_progress', progress: 65, cost: 20000 },
+  { id: 'iso9001', name: 'ISO 9001', description: 'Management qualité', status: 'not_started', nextAudit: 90, cost: 15000 },
+  { id: 'iso14001', name: 'ISO 14001', description: 'Management environnemental', status: 'not_started', progress: 0, cost: 20000 },
   { id: 'iso45001', name: 'ISO 45001', description: 'Santé et sécurité', status: 'not_started', cost: 18000 },
 ];
 
 const leanTools = [
-  { id: '5s', name: '5S', description: 'Organisation du poste de travail', implemented: true, impact: '+15% productivité' },
-  { id: 'smed', name: 'SMED', description: 'Réduction temps de changement', implemented: false, impact: '-50% temps setup' },
-  { id: 'kanban', name: 'Kanban', description: 'Gestion flux tirés', implemented: true, impact: '-30% stocks' },
-  { id: 'tpm', name: 'TPM', description: 'Maintenance productive totale', implemented: false, impact: '+20% disponibilité' },
-  { id: 'kaizen', name: 'Kaizen', description: 'Amélioration continue', implemented: true, impact: '+10% efficacité/an' },
-  { id: 'pokayoke', name: 'Poka-Yoke', description: 'Détrompeurs anti-erreur', implemented: false, impact: '-80% défauts' },
+  { id: '5s', name: '5S', description: 'Organisation du poste de travail', implemented: false, impact: '+15% productivité', cost: 5000 },
+  { id: 'smed', name: 'SMED', description: 'Réduction temps de changement', implemented: false, impact: '-50% temps setup', cost: 8000 },
+  { id: 'kanban', name: 'Kanban', description: 'Gestion flux tirés', implemented: false, impact: '-30% stocks', cost: 6000 },
+  { id: 'tpm', name: 'TPM', description: 'Maintenance productive totale', implemented: false, impact: '+20% disponibilité', cost: 12000 },
+  { id: 'kaizen', name: 'Kaizen', description: 'Amélioration continue', implemented: false, impact: '+10% efficacité/an', cost: 4000 },
+  { id: 'pokayoke', name: 'Poka-Yoke', description: 'Détrompeurs anti-erreur', implemented: false, impact: '-80% défauts', cost: 7000 },
 ];
 
-export function AdvancedProductionPanel({ company, onOptimizeProcess }: AdvancedProductionPanelProps) {
-  const [activeTab, setActiveTab] = useState<'lines' | 'quality' | 'lean' | 'maintenance' | 'kpi' | 'planning'>('lines');
+export function AdvancedProductionPanel({ 
+  company, 
+  productionLines = [],
+  onBuyEquipment, 
+  onScheduleMaintenance,
+  onOptimizeProcess,
+  onAddProductionLine,
+  onStartCertification
+}: AdvancedProductionPanelProps) {
+  const [activeTab, setActiveTab] = useState<'lines' | 'equipment' | 'quality' | 'lean' | 'maintenance' | 'kpi'>('lines');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  const productionLines = generateProductionLines(company.products);
-  
+  // Generate mock production lines if none provided
+  const lines = productionLines.length > 0 ? productionLines : [
+    { id: 'line1', name: 'Ligne Alpha', type: 'semi_auto' as const, capacity: 100, currentOutput: 78, efficiency: 82, maintenanceLevel: 75, status: 'running' as const, machines: [], shifts: [], products: company.products.slice(0, 1).map(p => p.id) },
+    { id: 'line2', name: 'Ligne Beta', type: 'automated' as const, capacity: 200, currentOutput: 165, efficiency: 88, maintenanceLevel: 90, status: 'running' as const, machines: [], shifts: [], products: company.products.slice(0, 2).map(p => p.id) },
+  ];
+
   // Calculate OEE (Overall Equipment Effectiveness)
-  const avgAvailability = productionLines.filter(l => l.status === 'running').length / productionLines.length * 100;
-  const avgPerformance = productionLines.reduce((sum, l) => sum + (l.currentOutput / l.capacity), 0) / productionLines.length * 100;
-  const avgQuality = 96; // Mock quality rate
+  const avgAvailability = lines.filter(l => l.status === 'running').length / Math.max(lines.length, 1) * 100;
+  const avgPerformance = lines.reduce((sum, l) => sum + (l.currentOutput / l.capacity), 0) / Math.max(lines.length, 1) * 100;
+  const avgQuality = 96;
   const oee = (avgAvailability / 100) * (avgPerformance / 100) * (avgQuality / 100) * 100;
 
   // Calculate inventory metrics
   const totalStockValue = company.inventory.reduce((sum, i) => sum + i.quantity * i.unitCost, 0);
   const lowStockItems = company.inventory.filter(i => i.quantity <= i.reorderLevel);
 
+  // Equipment categories
+  const equipmentCategories = [...new Set(EQUIPMENT_CATALOG.map(e => e.category))];
+
   const tabs = [
     { id: 'lines', label: 'Lignes', icon: Factory },
+    { id: 'equipment', label: 'Équipements', icon: ShoppingCart },
     { id: 'quality', label: 'Qualité', icon: Award },
     { id: 'lean', label: 'Lean', icon: Zap },
     { id: 'maintenance', label: 'Maintenance', icon: Wrench },
     { id: 'kpi', label: 'KPIs', icon: BarChart3 },
-    { id: 'planning', label: 'Planning', icon: Clock },
   ];
 
   return (
@@ -91,7 +107,7 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
         <div className="game-panel text-center">
           <Factory className="w-5 h-5 text-info mx-auto mb-1" />
           <p className="text-[10px] text-muted-foreground">Lignes Actives</p>
-          <p className="text-sm font-bold">{productionLines.filter(l => l.status === 'running').length}/{productionLines.length}</p>
+          <p className="text-sm font-bold">{lines.filter(l => l.status === 'running').length}/{lines.length}</p>
         </div>
         <div className="game-panel text-center">
           <TrendingUp className="w-5 h-5 text-success mx-auto mb-1" />
@@ -138,7 +154,7 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
       {activeTab === 'lines' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {productionLines.map(line => (
+            {lines.map(line => (
               <div key={line.id} className="game-panel">
                 <div className="flex justify-between items-start mb-3">
                   <div>
@@ -190,7 +206,10 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
                     <button className="flex-1 btn-game-primary text-xs py-1.5">
                       <Settings className="w-3 h-3 mr-1 inline" /> Configurer
                     </button>
-                    <button className="flex-1 btn-game-secondary text-xs py-1.5">
+                    <button 
+                      onClick={() => onScheduleMaintenance?.(line.id)}
+                      className="flex-1 btn-game-secondary text-xs py-1.5"
+                    >
                       <Wrench className="w-3 h-3 mr-1 inline" /> Maintenance
                     </button>
                   </div>
@@ -199,9 +218,106 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
             ))}
           </div>
 
-          <button className="w-full btn-game-primary flex items-center justify-center gap-2">
-            <Factory className="w-4 h-4" /> Ajouter une ligne de production
+          <button 
+            onClick={() => {
+              const newLine: ProductionLine = {
+                id: `line_${Date.now()}`,
+                name: `Ligne ${lines.length + 1}`,
+                type: 'semi_auto',
+                capacity: 100,
+                currentOutput: 0,
+                efficiency: 70,
+                maintenanceLevel: 100,
+                status: 'stopped',
+                machines: [],
+                shifts: [],
+                products: []
+              };
+              onAddProductionLine?.(newLine);
+            }}
+            disabled={company.treasury < 50000}
+            className="w-full btn-game-primary flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Factory className="w-4 h-4" /> Ajouter une ligne de production (50 000€)
           </button>
+        </div>
+      )}
+
+      {/* Equipment Shop Tab */}
+      {activeTab === 'equipment' && (
+        <div className="space-y-4">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setSelectedCategory('all')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs transition-colors",
+                selectedCategory === 'all' ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
+              )}
+            >
+              Tous
+            </button>
+            {equipmentCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs transition-colors capitalize",
+                  selectedCategory === cat ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80"
+                )}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {EQUIPMENT_CATALOG
+              .filter(eq => selectedCategory === 'all' || eq.category === selectedCategory)
+              .map(equipment => (
+              <div key={equipment.id} className="game-panel">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h4 className="font-display font-semibold">{equipment.name}</h4>
+                    <p className="text-xs text-muted-foreground capitalize">{equipment.category}</p>
+                  </div>
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-xs",
+                    equipment.tier === 'premium' ? "bg-purple-500/20 text-purple-400" :
+                    equipment.tier === 'advanced' ? "bg-info/20 text-info" :
+                    "bg-muted text-muted-foreground"
+                  )}>
+                    {equipment.tier}
+                  </span>
+                </div>
+                
+                <div className="space-y-2 text-xs mb-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Capacité</span>
+                    <span className="font-medium">+{equipment.capacityBoost} unités/jour</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Efficacité</span>
+                    <span className="font-medium text-success">+{equipment.efficiencyBoost}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Maintenance</span>
+                    <span className="font-medium">{formatCurrency(equipment.maintenanceCost)}/mois</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-lg">{formatCurrency(equipment.price)}</span>
+                  <button
+                    onClick={() => onBuyEquipment?.(equipment)}
+                    disabled={company.treasury < equipment.price}
+                    className="btn-game-primary text-xs py-1.5 px-4 disabled:opacity-50"
+                  >
+                    <ShoppingCart className="w-3 h-3 mr-1 inline" /> Acheter
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -239,7 +355,11 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
                     </>
                   )}
                   {cert.status === 'not_started' && (
-                    <button className="w-full btn-game-secondary text-xs py-1 mt-2">
+                    <button 
+                      onClick={() => onStartCertification?.(cert.id, cert.cost)}
+                      disabled={company.treasury < cert.cost}
+                      className="w-full btn-game-secondary text-xs py-1 mt-2 disabled:opacity-50"
+                    >
                       Démarrer ({formatCurrency(cert.cost)})
                     </button>
                   )}
@@ -297,13 +417,14 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
                     <div className="w-5 h-5 rounded-full border-2 border-muted-foreground shrink-0" />
                   )}
                 </div>
-                <p className="text-xs font-medium text-primary">{tool.impact}</p>
+                <p className="text-xs font-medium text-primary mb-2">{tool.impact}</p>
                 {!tool.implemented && (
                   <button 
                     onClick={() => onOptimizeProcess?.(tool.id)}
-                    className="w-full btn-game-primary text-xs py-1 mt-2"
+                    disabled={company.treasury < tool.cost}
+                    className="w-full btn-game-primary text-xs py-1 disabled:opacity-50"
                   >
-                    Implémenter
+                    Implémenter ({formatCurrency(tool.cost)})
                   </button>
                 )}
               </div>
@@ -320,7 +441,7 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
               <Wrench className="w-5 h-5 text-warning" /> Planning Maintenance
             </h4>
             <div className="space-y-3">
-              {productionLines.map(line => (
+              {lines.map(line => (
                 <div key={line.id} className="bg-secondary/50 rounded-lg p-3 flex justify-between items-center">
                   <div>
                     <p className="font-medium">{line.name}</p>
@@ -329,13 +450,19 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <GaugeBar 
-                      value={line.maintenanceLevel} 
-                      label="" 
-                      colorClass={line.maintenanceLevel >= 70 ? "bg-success" : line.maintenanceLevel >= 40 ? "bg-warning" : "bg-destructive"} 
-                    />
-                    <button className="btn-game-secondary text-xs py-1 px-3">
-                      Planifier
+                    <div className="w-24">
+                      <GaugeBar 
+                        value={line.maintenanceLevel} 
+                        label="" 
+                        colorClass={line.maintenanceLevel >= 70 ? "bg-success" : line.maintenanceLevel >= 40 ? "bg-warning" : "bg-destructive"} 
+                      />
+                    </div>
+                    <button 
+                      onClick={() => onScheduleMaintenance?.(line.id)}
+                      disabled={company.treasury < 2000}
+                      className="btn-game-secondary text-xs py-1 px-3 disabled:opacity-50"
+                    >
+                      Planifier (2 000€)
                     </button>
                   </div>
                 </div>
@@ -370,86 +497,23 @@ export function AdvancedProductionPanel({ company, onOptimizeProcess }: Advanced
           <h4 className="font-display font-semibold mb-4">Indicateurs de Performance Production</h4>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { name: 'OEE', value: oee, target: 85, unit: '%', good: true },
-              { name: 'Disponibilité', value: avgAvailability, target: 95, unit: '%', good: avgAvailability >= 90 },
-              { name: 'Performance', value: avgPerformance, target: 90, unit: '%', good: avgPerformance >= 85 },
-              { name: 'Qualité', value: avgQuality, target: 99, unit: '%', good: avgQuality >= 95 },
-              { name: 'Takt Time', value: 45, target: 40, unit: 's', good: false },
-              { name: 'Lead Time', value: 5.2, target: 4, unit: 'j', good: false },
-              { name: 'Rotation Stock', value: 8.5, target: 10, unit: 'x', good: false },
-              { name: 'Taux Rebut', value: 2.1, target: 1.5, unit: '%', good: false },
+              { name: 'OEE', value: oee, target: 85, unit: '%', good: oee >= 85 },
+              { name: 'Taux Qualité', value: avgQuality, target: 98, unit: '%', good: avgQuality >= 98 },
+              { name: 'Disponibilité', value: avgAvailability, target: 95, unit: '%', good: avgAvailability >= 95 },
+              { name: 'Performance', value: avgPerformance, target: 90, unit: '%', good: avgPerformance >= 90 },
+              { name: 'Temps Cycle', value: 45, target: 40, unit: 'min', good: false },
+              { name: 'Lead Time', value: 5, target: 3, unit: 'jours', good: false },
+              { name: 'Productivité', value: 85, target: 90, unit: '%', good: false },
+              { name: 'Rotation Stocks', value: 8, target: 12, unit: 'x/an', good: false },
             ].map(kpi => (
-              <div key={kpi.name} className="bg-secondary/50 rounded-lg p-3">
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-xs text-muted-foreground">{kpi.name}</p>
-                  {kpi.good ? <TrendingUp className="w-4 h-4 text-success" /> : <Target className="w-4 h-4 text-warning" />}
-                </div>
-                <p className={cn("text-xl font-bold", kpi.good ? "text-success" : "text-warning")}>
+              <div key={kpi.name} className="bg-secondary/50 rounded-lg p-4">
+                <p className="text-xs text-muted-foreground mb-1">{kpi.name}</p>
+                <p className={cn("text-2xl font-bold", kpi.good ? "text-success" : "text-warning")}>
                   {typeof kpi.value === 'number' ? kpi.value.toFixed(1) : kpi.value}{kpi.unit}
                 </p>
                 <p className="text-xs text-muted-foreground">Cible: {kpi.target}{kpi.unit}</p>
-                <GaugeBar 
-                  value={Math.min(100, (kpi.value / kpi.target) * 100)} 
-                  label="" 
-                  colorClass={kpi.good ? "bg-success" : "bg-warning"} 
-                />
               </div>
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* Planning Tab */}
-      {activeTab === 'planning' && (
-        <div className="game-panel">
-          <h4 className="font-display font-semibold mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-info" /> Planning de Production
-          </h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-2">Produit</th>
-                  <th className="text-center py-2">Ligne</th>
-                  <th className="text-right py-2">Quantité</th>
-                  <th className="text-right py-2">Produit</th>
-                  <th className="text-right py-2">Progression</th>
-                  <th className="text-center py-2">Priorité</th>
-                  <th className="text-center py-2">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {company.products.filter(p => p.phase !== 'rd').map((product, i) => (
-                  <tr key={product.id} className="border-b border-border/50">
-                    <td className="py-2 font-medium">{product.name}</td>
-                    <td className="text-center py-2">Ligne {['Alpha', 'Beta', 'Gamma'][i % 3]}</td>
-                    <td className="text-right py-2">{Math.round(product.salesVolume * 30)}</td>
-                    <td className="text-right py-2">{Math.round(product.salesVolume * 30 * 0.7)}</td>
-                    <td className="text-right py-2">
-                      <div className="flex items-center gap-2 justify-end">
-                        <div className="w-16">
-                          <GaugeBar value={70} label="" colorClass="bg-primary" />
-                        </div>
-                        <span>70%</span>
-                      </div>
-                    </td>
-                    <td className="text-center py-2">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded-full text-xs",
-                        i === 0 ? "bg-destructive/20 text-destructive" :
-                        i === 1 ? "bg-warning/20 text-warning" :
-                        "bg-muted text-muted-foreground"
-                      )}>
-                        {i === 0 ? 'Haute' : i === 1 ? 'Moyenne' : 'Basse'}
-                      </span>
-                    </td>
-                    <td className="text-center py-2">
-                      <span className="px-2 py-0.5 rounded-full text-xs bg-success/20 text-success">En cours</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
