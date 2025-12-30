@@ -1,6 +1,22 @@
 import { useState } from "react";
 import { Company, LegalStatus, Sector, LEGAL_STATUS_MODIFIERS } from "@/types/game";
 import { LEGAL_STRUCTURES, LegalStructureType, LegalStructure } from "@/types/legalStructures";
+import { 
+  CompanyBranding, 
+  CompanyValue, 
+  COMPANY_VALUES, 
+  OfficeChoice, 
+  OFFICE_OPTIONS,
+  CoFounder,
+  COFOUNDER_TEMPLATES,
+  BusinessPlan,
+  RevenueModel,
+  REVENUE_MODELS,
+  GrowthStrategy,
+  GROWTH_STRATEGIES,
+  LOGO_OPTIONS,
+  COLOR_OPTIONS,
+} from "@/types/advancedCreation";
 import { formatCurrency, generateEmployee } from "@/utils/gameEngine";
 import { createCompany } from "@/utils/companyFactory";
 import { 
@@ -8,7 +24,8 @@ import {
   MapPin, User, Target, Zap, Shield, TrendingUp, Globe, Briefcase,
   GraduationCap, Heart, Star, Coins, Clock, Trophy, Rocket, Crown,
   Lightbulb, Users, Handshake, Leaf, Flame, Sparkles, Gift, Building,
-  Landmark, Home, ChevronDown, ChevronUp, Info, Check
+  Landmark, Home, ChevronDown, ChevronUp, Info, Check, Palette, FileText,
+  PenTool, UserPlus, Percent
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +41,10 @@ export interface GameSettings {
   startingBonus: StartingBonus;
   objective: GameObjective;
   legalStructure: LegalStructureType;
+  branding?: CompanyBranding;
+  office?: OfficeChoice;
+  coFounders?: CoFounder[];
+  businessPlan?: BusinessPlan;
 }
 
 type Difficulty = 'tutorial' | 'easy' | 'normal' | 'hard' | 'hardcore';
