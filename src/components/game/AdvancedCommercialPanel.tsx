@@ -100,8 +100,8 @@ export function AdvancedCommercialPanel({
     ? company.clients.reduce((sum, c) => sum + c.relationshipScore, 0) / company.clients.length 
     : 0;
 
-  // Salesperson categories
-  const salespersonCategories = [...new Set(SALESPERSON_CATALOG.map(s => s.specialty))];
+  // Salesperson categories (use role instead of specialty)
+  const salespersonCategories = [...new Set(SALESPERSON_CATALOG.map(s => s.role))];
 
   const tabs = [
     { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
@@ -198,13 +198,15 @@ export function AdvancedCommercialPanel({
               {mockOpportunities
                 .filter(o => !selectedStage || o.stage === selectedStage)
                 .map(opp => {
-                  const daysOpen = Math.floor((Date.now() - opp.createdAt) / (24 * 60 * 60 * 1000));
+                  const createdTime = 'createdAt' in opp ? (opp as any).createdAt : Date.now();
+                  const daysOpen = Math.floor((Date.now() - createdTime) / (24 * 60 * 60 * 1000));
                   const stage = pipelineStages.find(s => s.id === opp.stage);
+                  const oppName = 'name' in opp ? (opp as any).name : `Opportunité ${opp.id}`;
                   return (
                     <div key={opp.id} className="bg-secondary/30 rounded-lg p-3 flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium">{opp.name}</p>
+                          <p className="font-medium">{oppName}</p>
                           <span className={cn(
                             "px-2 py-0.5 rounded-full text-xs",
                             stage?.color.replace('bg-', 'bg-') + '/20'
@@ -234,16 +236,26 @@ export function AdvancedCommercialPanel({
               const newProspect: CRMClient = {
                 id: `prospect_${Date.now()}`,
                 name: `Prospect ${Date.now()}`,
-                company: 'Nouvelle entreprise',
-                email: 'contact@example.com',
-                phone: '+33 1 00 00 00 00',
-                status: 'prospect',
-                source: 'direct',
-                score: 50,
-                createdAt: Date.now(),
+                type: 'prospect',
+                sector: 'services',
+                size: 'pme',
+                status: 'pending',
+                contactInfo: {
+                  email: 'contact@example.com',
+                  phone: '+33 1 00 00 00 00',
+                  address: 'Paris, France'
+                },
+                assignedTo: '',
+                revenue: 0,
+                potential: 50000,
                 lastContact: Date.now(),
-                interactions: [],
-                tags: []
+                nextAction: 'Premier contact',
+                nextActionDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
+                notes: [],
+                opportunities: [],
+                orders: [],
+                satisfaction: 0,
+                loyaltyScore: 0
               };
               onAddProspect?.(newProspect);
             }}
@@ -283,51 +295,71 @@ export function AdvancedCommercialPanel({
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {SALESPERSON_CATALOG
-              .filter(sp => selectedCategory === 'all' || sp.specialty === selectedCategory)
-              .map(salesperson => (
-              <div key={salesperson.id} className="game-panel">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h4 className="font-display font-semibold">{salesperson.name}</h4>
-                    <p className="text-xs text-muted-foreground capitalize">{salesperson.specialty}</p>
-                  </div>
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-xs",
-                    salesperson.level === 'senior' ? "bg-purple-500/20 text-purple-400" :
-                    salesperson.level === 'confirmed' ? "bg-info/20 text-info" :
-                    "bg-muted text-muted-foreground"
-                  )}>
-                    {salesperson.level}
-                  </span>
-                </div>
-                
-                <div className="space-y-2 text-xs mb-3">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Compétences</span>
-                    <span className="font-medium">{salesperson.skills}/100</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Négociation</span>
-                    <span className="font-medium text-success">+{salesperson.negotiationBonus}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Closing</span>
-                    <span className="font-medium text-primary">+{salesperson.closingBonus}%</span>
-                  </div>
-                </div>
+              .filter(sp => selectedCategory === 'all' || sp.role === selectedCategory)
+              .map(salesperson => {
+                const hiringCost = salesperson.baseSalary * 2; // 2 months salary as hiring cost
+                const hasNegotiation = salesperson.skills.includes('negotiation');
+                const hasClosing = salesperson.skills.includes('closing');
+                return (
+                  <div key={salesperson.id} className="game-panel">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <h4 className="font-display font-semibold">{salesperson.title}</h4>
+                        <p className="text-xs text-muted-foreground capitalize">{salesperson.role.replace('_', ' ')}</p>
+                      </div>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-xs",
+                        salesperson.experience >= 6 ? "bg-purple-500/20 text-purple-400" :
+                        salesperson.experience >= 3 ? "bg-info/20 text-info" :
+                        "bg-muted text-muted-foreground"
+                      )}>
+                        {salesperson.experience >= 6 ? 'Senior' : salesperson.experience >= 3 ? 'Confirmé' : 'Junior'}
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-2 text-xs mb-3">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Expérience</span>
+                        <span className="font-medium">{salesperson.experience} ans</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Commission</span>
+                        <span className="font-medium text-success">{Math.round(salesperson.commission * 100)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Compétences</span>
+                        <span className="font-medium text-primary">{salesperson.skills.length}</span>
+                      </div>
+                    </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-lg">{formatCurrency(salesperson.salary)}/mois</span>
-                  <button
-                    onClick={() => onHireSalesperson?.(salesperson)}
-                    disabled={company.treasury < salesperson.hiringCost}
-                    className="btn-game-primary text-xs py-1.5 px-4 disabled:opacity-50"
-                  >
-                    <UserPlus className="w-3 h-3 mr-1 inline" /> Recruter ({formatCurrency(salesperson.hiringCost)})
-                  </button>
-                </div>
-              </div>
-            ))}
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-lg">{formatCurrency(salesperson.baseSalary)}/an</span>
+                      <button
+                        onClick={() => {
+                          const fullSalesperson: Salesperson = {
+                            id: `sp_${Date.now()}`,
+                            name: salesperson.title,
+                            role: salesperson.role,
+                            salary: salesperson.baseSalary,
+                            commission: salesperson.commission,
+                            experience: salesperson.experience,
+                            skills: salesperson.skills,
+                            performance: 70,
+                            satisfaction: 80,
+                            clients: [],
+                            hireDate: Date.now()
+                          };
+                          onHireSalesperson?.(fullSalesperson);
+                        }}
+                        disabled={company.treasury < hiringCost}
+                        className="btn-game-primary text-xs py-1.5 px-4 disabled:opacity-50"
+                      >
+                        <UserPlus className="w-3 h-3 mr-1 inline" /> Recruter ({formatCurrency(hiringCost)})
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}

@@ -218,6 +218,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
       location,
       startingBonus,
       objective,
+      legalStructure: 'sas' as LegalStructureType, // Default mapping
     };
 
     onComplete(company, settings);
