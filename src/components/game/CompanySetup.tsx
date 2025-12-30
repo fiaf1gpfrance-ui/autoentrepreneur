@@ -166,6 +166,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
   const [step, setStep] = useState(1);
   const [companyName, setCompanyName] = useState("");
   const [legalStatus, setLegalStatus] = useState<LegalStatus | null>(null);
+  const [selectedLegalStructure, setSelectedLegalStructure] = useState<LegalStructureType | null>(null);
   const [sector, setSector] = useState<Sector | null>(null);
   const [capital, setCapital] = useState(10000);
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
@@ -174,20 +175,30 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
   const [location, setLocation] = useState<Location>('paris');
   const [startingBonus, setStartingBonus] = useState<StartingBonus>('none');
   const [objective, setObjective] = useState<GameObjective>('millionaire');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>('commercial');
+
+  // Handle legal structure selection
+  const handleSelectLegalStructure = (structureId: LegalStructureType) => {
+    setSelectedLegalStructure(structureId);
+    // Map to simplified legal status for game mechanics
+    const mappedStatus = legalStatusMapping[structureId];
+    setLegalStatus(mappedStatus);
+  };
 
   const handleComplete = () => {
-    if (!companyName || !legalStatus || !sector) return;
+    if (!companyName || !legalStatus || !sector || !selectedLegalStructure) return;
 
     const statusMod = LEGAL_STATUS_MODIFIERS[legalStatus];
-    let adjustedCapital = capital;
+    const structure = LEGAL_STRUCTURES[selectedLegalStructure];
+    let adjustedCapital = Math.max(capital, structure.capitalMin);
     
     // Apply starting bonus
     if (startingBonus === 'extra_cash') adjustedCapital += 50000;
     
     const company = createCompany(companyName, legalStatus, sector, adjustedCapital, 1);
     
-    // Apply credibility bonus from legal status
-    company.credibility = 50 + statusMod.credibilityBonus;
+    // Apply credibility bonus from legal structure
+    company.credibility = 50 + structure.credibilityBonus;
     
     // Apply reputation bonus
     if (startingBonus === 'reputation') {
@@ -218,7 +229,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
       location,
       startingBonus,
       objective,
-      legalStructure: 'sas' as LegalStructureType, // Default mapping
+      legalStructure: selectedLegalStructure,
     };
 
     onComplete(company, settings);
@@ -374,36 +385,130 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
             </div>
           )}
 
-          {/* Step 5: Legal Status & Sector */}
+          {/* Step 5: Legal Structure - Complete Selection */}
           {step === 5 && (
             <div className="space-y-6">
               <div className="text-center">
                 <h2 className="text-xl font-display font-semibold mb-2">Structure juridique</h2>
-                <p className="text-sm text-muted-foreground">Ce choix impacte votre fiscalité et crédibilité</p>
+                <p className="text-sm text-muted-foreground">Choisissez parmi 30+ formes juridiques françaises</p>
               </div>
-              <div className="grid gap-3">
-                {legalStatusOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setLegalStatus(option.value)}
-                    className={cn(
-                      "flex items-start gap-4 p-4 rounded-lg border text-left transition-all",
-                      legalStatus === option.value ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-                    )}
-                  >
-                    <option.icon className={cn("w-6 h-6 shrink-0", legalStatus === option.value ? "text-primary" : "text-muted-foreground")} />
-                    <div>
-                      <h3 className="font-display font-semibold">{option.label}</h3>
-                      <p className="text-sm text-muted-foreground">{option.description}</p>
+              
+              <div className="max-h-[400px] overflow-y-auto pr-2 space-y-3">
+                {Object.entries(structuresByCategory).map(([catKey, category]) => {
+                  const CategoryIcon = category.icon;
+                  const isExpanded = expandedCategory === catKey;
+                  const hasSelectedStructure = category.structures.some(s => s === selectedLegalStructure);
+                  
+                  return (
+                    <div key={catKey} className={cn(
+                      "rounded-lg border transition-all",
+                      hasSelectedStructure ? "border-primary bg-primary/5" : "border-border"
+                    )}>
+                      <button
+                        onClick={() => setExpandedCategory(isExpanded ? null : catKey)}
+                        className="w-full flex items-center justify-between p-3 hover:bg-secondary/50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <CategoryIcon className={cn("w-5 h-5", hasSelectedStructure ? "text-primary" : "text-muted-foreground")} />
+                          <span className="font-semibold">{category.label}</span>
+                          <span className="text-xs text-muted-foreground">({category.structures.length})</span>
+                        </div>
+                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      </button>
+                      
+                      {isExpanded && (
+                        <div className="px-3 pb-3 space-y-2">
+                          {category.structures.map(structId => {
+                            const structure = LEGAL_STRUCTURES[structId];
+                            if (!structure) return null;
+                            const isSelected = selectedLegalStructure === structId;
+                            
+                            return (
+                              <button
+                                key={structId}
+                                onClick={() => handleSelectLegalStructure(structId)}
+                                className={cn(
+                                  "w-full flex flex-col p-3 rounded-lg border text-left transition-all",
+                                  isSelected ? "border-primary bg-primary/10" : "border-border/50 hover:border-primary/50 hover:bg-secondary/30"
+                                )}
+                              >
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold">{structure.name}</span>
+                                    {isSelected && <Check className="w-4 h-4 text-primary" />}
+                                  </div>
+                                  <span className={cn(
+                                    "text-xs px-2 py-0.5 rounded-full",
+                                    structure.credibilityBonus >= 15 ? "bg-success/20 text-success" :
+                                    structure.credibilityBonus >= 5 ? "bg-info/20 text-info" :
+                                    structure.credibilityBonus < 0 ? "bg-destructive/20 text-destructive" :
+                                    "bg-muted text-muted-foreground"
+                                  )}>
+                                    {structure.credibilityBonus >= 0 ? '+' : ''}{structure.credibilityBonus} créd.
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mb-2">{structure.description}</p>
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                  <span className="px-2 py-0.5 bg-secondary rounded">
+                                    Capital min: {structure.capitalMin === 0 ? '0€' : formatCurrency(structure.capitalMin)}
+                                  </span>
+                                  <span className="px-2 py-0.5 bg-secondary rounded">
+                                    Charges: {Math.round(structure.socialChargesRate * 100)}%
+                                  </span>
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded",
+                                    structure.limitedLiability ? "bg-success/20 text-success" : "bg-warning/20 text-warning"
+                                  )}>
+                                    {structure.limitedLiability ? 'Resp. limitée' : 'Resp. illimitée'}
+                                  </span>
+                                  {structure.canRaiseFunds && (
+                                    <span className="px-2 py-0.5 bg-primary/20 text-primary rounded">Levée de fonds</span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </button>
-                ))}
+                  );
+                })}
               </div>
+
+              {/* Selected structure summary */}
+              {selectedLegalStructure && LEGAL_STRUCTURES[selectedLegalStructure] && (
+                <div className="bg-primary/10 border border-primary rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="w-4 h-4 text-primary" />
+                    <span className="font-semibold">{LEGAL_STRUCTURES[selectedLegalStructure].fullName}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                    <div>
+                      <span className="text-muted-foreground">Impôt: </span>
+                      <span className="font-medium">{LEGAL_STRUCTURES[selectedLegalStructure].taxRegime.toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Social: </span>
+                      <span className="font-medium">{LEGAL_STRUCTURES[selectedLegalStructure].socialRegime.toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Complexité: </span>
+                      <span className="font-medium">{LEGAL_STRUCTURES[selectedLegalStructure].governanceComplexity}/5</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {LEGAL_STRUCTURES[selectedLegalStructure].advantages.slice(0, 3).map((adv, i) => (
+                      <span key={i} className="text-xs px-2 py-0.5 bg-success/20 text-success rounded">✓ {adv}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button onClick={() => setStep(4)} className="flex-1 btn-game-secondary">Retour</button>
                 <button
-                  onClick={() => legalStatus && setStep(6)}
-                  disabled={!legalStatus}
+                  onClick={() => selectedLegalStructure && setStep(6)}
+                  disabled={!selectedLegalStructure}
                   className="flex-1 btn-game-primary disabled:opacity-50"
                 >
                   Continuer
@@ -594,7 +699,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Statut</span>
-                    <span className="font-medium">{legalStatus ? legalStatusOptions.find(o => o.value === legalStatus)?.label : '-'}</span>
+                    <span className="font-medium">{selectedLegalStructure ? LEGAL_STRUCTURES[selectedLegalStructure]?.name : '-'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Secteur</span>
