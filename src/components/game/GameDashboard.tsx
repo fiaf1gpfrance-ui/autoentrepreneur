@@ -1415,7 +1415,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
             {activeTab === 'advancedproduction' && (
               <AdvancedProductionPanel
                 company={company}
-                onCreateProductionLine={(line) => toast.success(`Ligne ${line.name} créée !`)}
+                onAddProductionLine={(line) => toast.success(`Ligne ${line.name} créée !`)}
                 onScheduleMaintenance={(lineId) => toast.info(`Maintenance planifiée`)}
                 onOptimizeProcess={(type) => toast.success(`Optimisation ${type} lancée !`)}
               />

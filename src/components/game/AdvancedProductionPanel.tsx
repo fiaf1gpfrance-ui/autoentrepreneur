@@ -67,12 +67,12 @@ export function AdvancedProductionPanel({
 
   // Generate mock production lines if none provided
   const lines = productionLines.length > 0 ? productionLines : [
-    { id: 'line1', name: 'Ligne Alpha', type: 'semi_auto' as const, capacity: 100, currentOutput: 78, efficiency: 82, maintenanceLevel: 75, status: 'running' as const, machines: [], shifts: [], products: company.products.slice(0, 1).map(p => p.id) },
-    { id: 'line2', name: 'Ligne Beta', type: 'automated' as const, capacity: 200, currentOutput: 165, efficiency: 88, maintenanceLevel: 90, status: 'running' as const, machines: [], shifts: [], products: company.products.slice(0, 2).map(p => p.id) },
+    { id: 'line1', name: 'Ligne Alpha', type: 'assembly' as const, capacity: 100, currentOutput: 78, efficiency: 82, maintenanceLevel: 75, status: 'operational' as const, equipment: [], workers: 3, lastMaintenance: 0, operatingCosts: 500, quality: 85 },
+    { id: 'line2', name: 'Ligne Beta', type: 'automated' as const, capacity: 200, currentOutput: 165, efficiency: 88, maintenanceLevel: 90, status: 'operational' as const, equipment: [], workers: 5, lastMaintenance: 0, operatingCosts: 800, quality: 92 },
   ];
 
   // Calculate OEE (Overall Equipment Effectiveness)
-  const avgAvailability = lines.filter(l => l.status === 'running').length / Math.max(lines.length, 1) * 100;
+  const avgAvailability = lines.filter(l => l.status === 'operational').length / Math.max(lines.length, 1) * 100;
   const avgPerformance = lines.reduce((sum, l) => sum + (l.currentOutput / l.capacity), 0) / Math.max(lines.length, 1) * 100;
   const avgQuality = 96;
   const oee = (avgAvailability / 100) * (avgPerformance / 100) * (avgQuality / 100) * 100;
@@ -107,7 +107,7 @@ export function AdvancedProductionPanel({
         <div className="game-panel text-center">
           <Factory className="w-5 h-5 text-info mx-auto mb-1" />
           <p className="text-[10px] text-muted-foreground">Lignes Actives</p>
-          <p className="text-sm font-bold">{lines.filter(l => l.status === 'running').length}/{lines.length}</p>
+          <p className="text-sm font-bold">{lines.filter(l => l.status === 'operational').length}/{lines.length}</p>
         </div>
         <div className="game-panel text-center">
           <TrendingUp className="w-5 h-5 text-success mx-auto mb-1" />
@@ -163,11 +163,11 @@ export function AdvancedProductionPanel({
                   </div>
                   <span className={cn(
                     "px-2 py-0.5 rounded-full text-xs font-medium",
-                    line.status === 'running' ? "bg-success/20 text-success" :
+                    line.status === 'operational' ? "bg-success/20 text-success" :
                     line.status === 'maintenance' ? "bg-warning/20 text-warning" :
                     "bg-destructive/20 text-destructive"
                   )}>
-                    {line.status === 'running' ? 'En marche' : line.status === 'maintenance' ? 'Maintenance' : 'Arrêt'}
+                    {line.status === 'operational' ? 'En marche' : line.status === 'maintenance' ? 'Maintenance' : 'Arrêt'}
                   </span>
                 </div>
 
@@ -223,15 +223,17 @@ export function AdvancedProductionPanel({
               const newLine: ProductionLine = {
                 id: `line_${Date.now()}`,
                 name: `Ligne ${lines.length + 1}`,
-                type: 'semi_auto',
+                type: 'assembly',
                 capacity: 100,
                 currentOutput: 0,
                 efficiency: 70,
                 maintenanceLevel: 100,
                 status: 'stopped',
-                machines: [],
-                shifts: [],
-                products: []
+                equipment: [],
+                workers: 0,
+                lastMaintenance: 0,
+                operatingCosts: 300,
+                quality: 80
               };
               onAddProductionLine?.(newLine);
             }}
@@ -282,22 +284,22 @@ export function AdvancedProductionPanel({
                   </div>
                   <span className={cn(
                     "px-2 py-0.5 rounded-full text-xs",
-                    equipment.tier === 'premium' ? "bg-purple-500/20 text-purple-400" :
-                    equipment.tier === 'advanced' ? "bg-info/20 text-info" :
+                    equipment.category === 'premium' || equipment.category === 'cutting_edge' ? "bg-purple-500/20 text-purple-400" :
+                    equipment.category === 'advanced' ? "bg-info/20 text-info" :
                     "bg-muted text-muted-foreground"
                   )}>
-                    {equipment.tier}
+                    {equipment.category}
                   </span>
                 </div>
                 
                 <div className="space-y-2 text-xs mb-3">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Capacité</span>
-                    <span className="font-medium">+{equipment.capacityBoost} unités/jour</span>
+                    <span className="font-medium">+{equipment.capacityBonus} unités/jour</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Efficacité</span>
-                    <span className="font-medium text-success">+{equipment.efficiencyBoost}%</span>
+                    <span className="font-medium text-success">+{Math.round(equipment.efficiency * 100)}%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Maintenance</span>
@@ -308,7 +310,16 @@ export function AdvancedProductionPanel({
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-lg">{formatCurrency(equipment.price)}</span>
                   <button
-                    onClick={() => onBuyEquipment?.(equipment)}
+                    onClick={() => {
+                      const fullEquipment: ProductionEquipment = {
+                        ...equipment,
+                        id: `eq_${Date.now()}`,
+                        purchasePrice: equipment.price,
+                        condition: 100,
+                        purchaseDate: Date.now()
+                      };
+                      onBuyEquipment?.(fullEquipment);
+                    }}
                     disabled={company.treasury < equipment.price}
                     className="btn-game-primary text-xs py-1.5 px-4 disabled:opacity-50"
                   >
