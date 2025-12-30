@@ -14,7 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      game_saves: {
+        Row: {
+          company_data: Json
+          created_at: string
+          game_settings: Json
+          game_state: Json
+          id: string
+          is_auto_save: boolean
+          play_time: number
+          save_name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          company_data: Json
+          created_at?: string
+          game_settings: Json
+          game_state: Json
+          id?: string
+          is_auto_save?: boolean
+          play_time?: number
+          save_name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          company_data?: Json
+          created_at?: string
+          game_settings?: Json
+          game_state?: Json
+          id?: string
+          is_auto_save?: boolean
+          play_time?: number
+          save_name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

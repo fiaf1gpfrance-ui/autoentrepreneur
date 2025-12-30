@@ -60,6 +60,9 @@ import { AdvancedInternationalPanel } from "./AdvancedInternationalPanel";
 import { UltraFinancePanel } from "./UltraFinancePanel";
 import { AdvancedProductionPanel } from "./AdvancedProductionPanel";
 import { AdvancedCommercialPanel } from "./AdvancedCommercialPanel";
+import { SaveLoadPanel } from "./SaveLoadPanel";
+import { GameSave } from "@/hooks/useGameSave";
+import { GameSettings } from "./CompanySetup";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   calculateDailyCoinGain, 
@@ -125,6 +128,16 @@ type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate'
 export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [showSavePanel, setShowSavePanel] = useState(false);
+  const [gameSettings, setGameSettings] = useState<GameSettings>({
+    difficulty: 'normal',
+    gameMode: 'career',
+    founderType: 'visionary',
+    location: 'paris',
+    startingBonus: 'none',
+    objective: 'millionaire',
+    legalStructure: 'sas'
+  });
 
   const company = gameState.company!;
   const weather = weatherConfig[gameState.economicWeather];
@@ -977,9 +990,23 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   }, [company.activeCrises, company.treasury]);
 
   const handleSave = useCallback(() => {
-    saveGame(gameState);
-    toast.success("Partie sauvegardée !");
-  }, [gameState]);
+    setShowSavePanel(true);
+  }, []);
+
+  const handleLoadSave = useCallback((save: GameSave) => {
+    setGameState(prev => ({
+      ...prev,
+      company: save.company_data,
+      day: save.game_state.day,
+      month: save.game_state.month,
+      year: save.game_state.year,
+      isPaused: true,
+    }));
+    if (save.game_settings) {
+      setGameSettings(save.game_settings);
+    }
+    setShowSavePanel(false);
+  }, []);
 
   // Calculations
   const bfr = calculateBFR(company);
@@ -1432,6 +1459,33 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
           </div>
         </div>
       </div>
+
+      {/* Save/Load Panel Modal */}
+      {showSavePanel && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <SaveLoadPanel
+              company={company}
+              gameState={{
+                day: gameState.day,
+                month: gameState.month,
+                year: gameState.year,
+                isPaused: gameState.isPaused,
+                speed: gameState.gameSpeed
+              }}
+              settings={gameSettings}
+              onLoad={handleLoadSave}
+              onClose={() => setShowSavePanel(false)}
+            />
+            <button
+              onClick={() => setShowSavePanel(false)}
+              className="mt-4 w-full btn-game-secondary"
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
