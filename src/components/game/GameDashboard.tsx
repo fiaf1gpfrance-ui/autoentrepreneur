@@ -63,6 +63,9 @@ import { AdvancedCommercialPanel } from "./AdvancedCommercialPanel";
 import { SaveLoadPanel } from "./SaveLoadPanel";
 import { GameSave } from "@/hooks/useGameSave";
 import { GameSettings } from "./CompanySetup";
+import { InvestorsPanel } from "./InvestorsPanel";
+import { CompetitionPanel } from "./CompetitionPanel";
+import { RichEventsPanel } from "./RichEventsPanel";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   calculateDailyCoinGain, 
@@ -107,6 +110,9 @@ import {
   Coins,
   Gem,
   Gift,
+  Swords,
+  Eye,
+  PieChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -123,7 +129,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'investors' | 'competition' | 'richevents';
 
 export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
@@ -1048,6 +1054,9 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'shop', label: 'Boutique', icon: ShoppingCart },
     { id: 'progression', label: 'Progression', icon: Star },
     { id: 'achievements', label: 'Trophées', icon: Trophy },
+    { id: 'investors', label: 'Investisseurs', icon: PieChart },
+    { id: 'competition', label: 'Concurrence', icon: Swords },
+    { id: 'richevents', label: 'Événements', icon: Eye },
     { id: 'marketing', label: 'Marketing', icon: Megaphone },
     { id: 'technology', label: 'R&D', icon: Cpu },
     { id: 'crises', label: 'Crises', icon: AlertTriangle },
@@ -1135,7 +1144,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
           <div className="col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard label="Trésorerie" value={formatCurrency(company.treasury)} icon={Wallet} colorClass={company.treasury >= 0 ? "text-success" : "text-destructive"} subValue={`BFR: ${formatCurrency(bfr)}`} />
             <StatCard label="CA Mensuel" value={formatCurrency(company.monthlyRevenue)} icon={TrendingUp} colorClass="text-success" subValue={`Dépenses: ${formatCurrency(company.monthlyExpenses)}`} />
-            <StatCard label="Score CFS" value={`${Math.round(company.credibility)}/100`} icon={Shield} colorClass={getCredibilityColor(company.credibility)} subValue="Crédibilité Fiscale & Sociale" />
+            <StatCard label="Crédibilité" value={`${Math.round(company.credibility)}/100`} icon={Shield} colorClass={getCredibilityColor(company.credibility)} subValue="Réputation sociale" />
             <StatCard label="Moral Équipe" value={formatPercent(avgMoral)} icon={Heart} colorClass={getMoralColor(avgMoral)} subValue={`${company.employees.length} employé(s)`} />
           </div>
 
@@ -1144,7 +1153,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
             <div className="game-panel space-y-4">
               <h2 className="font-display font-semibold">Indicateurs Clés</h2>
               <div className="grid grid-cols-2 gap-6">
-                <GaugeBar value={company.credibility} label="Crédibilité CFS" colorClass={company.credibility >= 80 ? "bg-success" : company.credibility >= 50 ? "bg-warning" : "bg-destructive"} />
+                <GaugeBar value={company.credibility} label="Crédibilité" colorClass={company.credibility >= 80 ? "bg-success" : company.credibility >= 50 ? "bg-warning" : "bg-destructive"} />
                 <GaugeBar value={avgMoral} label="Moral Global" colorClass={avgMoral >= 70 ? "bg-success" : avgMoral >= 40 ? "bg-warning" : "bg-destructive"} />
               </div>
               <div className="grid grid-cols-3 gap-4 text-center pt-4 border-t border-border">
@@ -1200,6 +1209,78 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
               <AchievementsPanel
                 achievements={company.achievements}
                 missions={company.missions}
+              />
+            )}
+
+            {activeTab === 'investors' && (
+              <InvestorsPanel
+                company={company}
+                gameState={gameState}
+                onFundingRound={(amount, equity, investorIds) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      treasury: prev.company!.treasury + amount,
+                      capital: prev.company!.capital + amount,
+                    },
+                  }));
+                  toast.success(`Levée de fonds réussie: ${formatCurrency(amount)} pour ${equity}% d'equity !`);
+                }}
+              />
+            )}
+
+            {activeTab === 'competition' && (
+              <CompetitionPanel
+                company={company}
+                day={gameState.day}
+                onEspionage={(actionId, targetId, cost) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      treasury: prev.company!.treasury - cost,
+                    },
+                  }));
+                  toast.success(`Action de renseignement lancée !`);
+                }}
+                onCompetitiveAction={(action, cost) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      treasury: prev.company!.treasury - cost,
+                      marketShare: Math.min(100, prev.company!.marketShare + 2),
+                    },
+                  }));
+                  toast.success(`Action compétitive "${action}" lancée !`);
+                }}
+              />
+            )}
+
+            {activeTab === 'richevents' && (
+              <RichEventsPanel
+                company={company}
+                gameState={gameState}
+                activeEvents={[]}
+                economicNews={[]}
+                onEventChoice={(eventId, choiceId, effects) => {
+                  if (effects.treasury) {
+                    setGameState(prev => ({
+                      ...prev,
+                      company: {
+                        ...prev.company!,
+                        treasury: prev.company!.treasury + effects.treasury,
+                        credibility: effects.credibility 
+                          ? Math.max(0, Math.min(100, prev.company!.credibility + effects.credibility))
+                          : prev.company!.credibility,
+                      },
+                    }));
+                  }
+                }}
+                onDismissEvent={(eventId) => {
+                  toast.info(`Événement fermé`);
+                }}
               />
             )}
 

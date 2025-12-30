@@ -64,7 +64,7 @@ export function EventCard({ event, onDismiss }: EventCardProps) {
                     ? "bg-primary/20 text-primary" 
                     : "bg-destructive/20 text-destructive"
                 )}>
-                  CFS {event.effects.credibility > 0 ? '+' : ''}{event.effects.credibility}
+                  Créd. {event.effects.credibility > 0 ? '+' : ''}{event.effects.credibility}
                 </span>
               )}
               {event.effects.moral && (
