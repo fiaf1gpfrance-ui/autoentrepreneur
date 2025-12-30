@@ -1,7 +1,7 @@
 // Company Factory - Helper to create companies with all required fields
 import { Company, LegalStatus, Sector } from '@/types/game';
 import { createInitialBankAccount } from './bankingEngine';
-import { initializeAchievements } from './competitionEngine';
+import { initializeAchievements } from './achievementEngine';
 import { createProduct } from './productFactory';
 
 export function createCompany(

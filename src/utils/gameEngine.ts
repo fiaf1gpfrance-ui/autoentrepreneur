@@ -420,20 +420,47 @@ export function processDayTick(state: GameState): GameState {
     return emp;
   });
 
-  // Check unpaid tax declarations
+  // Check unpaid tax declarations - SIMPLIFIED SYSTEM
+  // If taxes unpaid for more than 360 days (1 year), URSSAF takes 50% of treasury
+  const currentGameDay = newState.day + (newState.month - 1) * 30 + (newState.year - 1) * 360;
+  
   company.taxDeclarations = company.taxDeclarations.map(decl => {
-    if (!decl.paid && newState.day > decl.dueDate) {
-      // Apply penalty
-      decl.penalty = (decl.penalty || 0) + decl.amount * 0.05;
-      company.credibility = Math.max(0, company.credibility - 2);
+    if (!decl.paid) {
+      const daysSinceDue = currentGameDay - decl.dueDate;
+      
+      // Small penalty after due date (5% per month)
+      if (daysSinceDue > 0 && daysSinceDue <= 360) {
+        decl.penalty = Math.round(decl.amount * 0.05 * Math.ceil(daysSinceDue / 30));
+      }
+      
+      // MASSIVE PENALTY: After 1 year of non-payment, URSSAF seizure!
+      if (daysSinceDue > 360) {
+        const seizure = company.treasury * 0.5;
+        company.treasury -= seizure;
+        company.credibility = Math.max(0, company.credibility - 30);
+        // Mark as paid (forcefully) with the seizure
+        decl.paid = true;
+        decl.penalty = seizure;
+        
+        // Generate event for this
+        newState.activeEvents = [...newState.activeEvents, {
+          id: `urssaf_seizure_${Date.now()}`,
+          title: "🚨 SAISIE URSSAF",
+          description: `L'URSSAF a saisi 50% de votre trésorerie (${formatCurrency(seizure)}) pour non-paiement de ${decl.type.toUpperCase()} depuis plus d'un an.`,
+          category: 'administratif' as const,
+          severity: 'critical' as const,
+          effects: { treasury: -seizure, credibility: -30 },
+          day: newState.day,
+        }];
+      }
     }
     return decl;
   });
 
-  // Check credibility game over
-  if (company.credibility < 20) {
+  // Check credibility game over - simplified
+  if (company.credibility <= 0) {
     newState.gameOver = true;
-    newState.gameOverReason = "Contrôle fiscal fatal : Votre crédibilité est tombée en dessous de 20.";
+    newState.gameOverReason = "Faillite : Votre crédibilité est tombée à zéro suite aux contrôles fiscaux.";
   }
 
   // Generate random event
