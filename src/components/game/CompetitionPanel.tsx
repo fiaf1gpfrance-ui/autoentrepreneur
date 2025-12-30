@@ -2,18 +2,9 @@ import { useState } from "react";
 import { Company, Competitor } from "@/types/game";
 import { 
   CompetitorAI, 
-  MarketIntelligence,
   ESPIONAGE_ACTIONS,
   COMPETITOR_TEMPLATES,
 } from "@/types/competition";
-import { 
-  initializeCompetitors,
-  updateCompetitorActions,
-  performEspionage,
-  calculateMarketShare,
-  getMarketIntelligence,
-  launchCompetitiveAction,
-} from "@/utils/competitionEngine";
 import { formatCurrency, formatPercent } from "@/utils/gameEngine";
 import { 
   Target, 
@@ -26,11 +17,9 @@ import {
   Zap,
   BarChart3,
   Users,
-  DollarSign,
   Star,
   ChevronDown,
   ChevronUp,
-  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -38,7 +27,7 @@ import { toast } from "sonner";
 interface CompetitionPanelProps {
   company: Company;
   day: number;
-  onEspionage: (action: string, targetId: string, cost: number) => void;
+  onEspionage: (actionId: string, targetId: string, cost: number) => void;
   onCompetitiveAction: (action: string, cost: number) => void;
 }
 
@@ -52,10 +41,26 @@ export function CompetitionPanel({
   const [selectedCompetitorId, setSelectedCompetitorId] = useState<string | null>(null);
   const [expandedCompetitor, setExpandedCompetitor] = useState<string | null>(null);
 
-  // Initialize data if not present
-  const competitors = company.competitorsAI || initializeCompetitors(company.sector);
-  const marketShare = calculateMarketShare(company, competitors);
-  const intelligence = getMarketIntelligence(company, competitors, day);
+  // Use existing competitors or generate from templates
+  const competitors: Competitor[] = company.competitors.length > 0 
+    ? company.competitors 
+    : COMPETITOR_TEMPLATES.filter(t => t.sector === company.sector).map((t, i) => ({
+        id: `comp_${i}`,
+        name: t.name,
+        sector: t.sector,
+        size: t.size as 'startup' | 'pme' | 'eti' | 'grande_entreprise',
+        marketShare: t.marketShare / 100,
+        aggressiveness: t.aggressiveness,
+        innovation: t.innovation,
+        reputation: t.reputation,
+        products: t.products.map(p => ({
+          name: p.name,
+          price: p.price,
+          quality: p.quality,
+          marketShare: p.marketShare / 100,
+        })),
+        priceLevel: t.strategy === 'low_cost' ? 0.8 : t.strategy === 'premium' ? 1.3 : 1.0,
+      }));
 
   const tabs = [
     { id: 'overview', label: 'Marché', icon: BarChart3 },
@@ -89,6 +94,10 @@ export function CompetitionPanel({
     onCompetitiveAction(actionType, cost);
   };
 
+  // Calculate market share
+  const totalMarketShare = competitors.reduce((sum, c) => sum + c.marketShare, 0);
+  const yourMarketShare = Math.max(0.05, company.marketShare / 100);
+
   const renderOverview = () => (
     <div className="space-y-6">
       {/* Market Share Chart */}
@@ -102,12 +111,12 @@ export function CompetitionPanel({
           <div>
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-semibold text-primary">{company.name} (Vous)</span>
-              <span className="text-sm font-bold text-primary">{formatPercent(marketShare.yourShare * 100)}</span>
+              <span className="text-sm font-bold text-primary">{formatPercent(yourMarketShare * 100)}</span>
             </div>
             <div className="w-full bg-secondary rounded-full h-4">
               <div 
                 className="bg-primary rounded-full h-4 transition-all"
-                style={{ width: `${marketShare.yourShare * 100}%` }}
+                style={{ width: `${Math.min(100, yourMarketShare * 100)}%` }}
               />
             </div>
           </div>
@@ -124,7 +133,7 @@ export function CompetitionPanel({
                 <div className="w-full bg-secondary rounded-full h-3">
                   <div 
                     className={cn("rounded-full h-3 transition-all", colors[index % colors.length])}
-                    style={{ width: `${comp.marketShare * 100}%` }}
+                    style={{ width: `${Math.min(100, comp.marketShare * 100)}%` }}
                   />
                 </div>
               </div>
@@ -133,56 +142,31 @@ export function CompetitionPanel({
         </div>
       </div>
 
-      {/* Market Intelligence Summary */}
+      {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-4">
         <div className="game-panel p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <TrendingUp className="w-4 h-4" />
-            <span className="text-sm">Position concurrentielle</span>
+            <span className="text-sm">Votre position</span>
           </div>
           <div className={cn(
             "text-2xl font-bold",
-            intelligence.positionScore > 60 ? "text-success" :
-            intelligence.positionScore > 40 ? "text-warning" : "text-destructive"
+            yourMarketShare > 0.2 ? "text-success" :
+            yourMarketShare > 0.1 ? "text-warning" : "text-muted-foreground"
           )}>
-            {intelligence.positionScore}/100
+            #{competitors.filter(c => c.marketShare > yourMarketShare).length + 1}
           </div>
         </div>
         <div className="game-panel p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <AlertTriangle className="w-4 h-4" />
-            <span className="text-sm">Niveau de menace</span>
+            <span className="text-sm">Concurrents agressifs</span>
           </div>
-          <div className={cn(
-            "text-2xl font-bold",
-            intelligence.threatLevel < 30 ? "text-success" :
-            intelligence.threatLevel < 60 ? "text-warning" : "text-destructive"
-          )}>
-            {intelligence.threatLevel}/100
+          <div className="text-2xl font-bold text-warning">
+            {competitors.filter(c => c.aggressiveness > 70).length}
           </div>
         </div>
       </div>
-
-      {/* Recent Competitor Actions */}
-      {intelligence.recentActions.length > 0 && (
-        <div className="game-panel p-4">
-          <h3 className="font-display font-semibold mb-4 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-warning" />
-            Actions récentes des concurrents
-          </h3>
-          <div className="space-y-2">
-            {intelligence.recentActions.map((action, index) => (
-              <div 
-                key={index}
-                className="flex items-center justify-between p-2 bg-secondary/50 rounded-lg"
-              >
-                <span className="text-sm">{action.description}</span>
-                <span className="text-xs text-muted-foreground">Jour {action.day}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -259,17 +243,9 @@ export function CompetitionPanel({
                           className="flex items-center justify-between p-2 bg-secondary/30 rounded-lg text-sm"
                         >
                           <span>{product.name}</span>
-                          <div className="flex items-center gap-4">
-                            <span className="text-muted-foreground">
-                              {formatCurrency(product.price)}
-                            </span>
-                            <span className={cn(
-                              comp.priceLevel < 1 ? "text-destructive" : 
-                              comp.priceLevel > 1 ? "text-success" : "text-muted-foreground"
-                            )}>
-                              {comp.priceLevel < 1 ? 'Prix bas' : comp.priceLevel > 1 ? 'Prix haut' : 'Prix moyen'}
-                            </span>
-                          </div>
+                          <span className="text-muted-foreground">
+                            {formatCurrency(product.price)}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -282,14 +258,14 @@ export function CompetitionPanel({
                     onClick={() => setSelectedCompetitorId(comp.id)}
                     className="flex-1 btn-game-secondary text-sm py-2"
                   >
-                    <Eye className="w-4 h-4 mr-1" />
+                    <Eye className="w-4 h-4 mr-1 inline" />
                     Espionner
                   </button>
                   <button 
                     onClick={() => handleLaunchAction('price_war', 5000)}
                     className="flex-1 btn-game-primary text-sm py-2"
                   >
-                    <Swords className="w-4 h-4 mr-1" />
+                    <Swords className="w-4 h-4 mr-1 inline" />
                     Attaquer
                   </button>
                 </div>
@@ -333,7 +309,7 @@ export function CompetitionPanel({
       <div className="grid gap-3">
         {ESPIONAGE_ACTIONS.map(action => {
           const canAfford = company.treasury >= action.cost;
-          const requiresTarget = action.id !== 'market_study';
+          const requiresTarget = action.type !== 'market_research';
           const isDisabled = !canAfford || (requiresTarget && !selectedCompetitorId);
           
           return (
@@ -348,14 +324,14 @@ export function CompetitionPanel({
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     "w-10 h-10 rounded-full flex items-center justify-center",
-                    action.risk === 'low' ? "bg-success/20" :
-                    action.risk === 'medium' ? "bg-warning/20" :
+                    action.riskLevel <= 2 ? "bg-success/20" :
+                    action.riskLevel <= 3 ? "bg-warning/20" :
                     "bg-destructive/20"
                   )}>
                     <Eye className={cn(
                       "w-5 h-5",
-                      action.risk === 'low' ? "text-success" :
-                      action.risk === 'medium' ? "text-warning" :
+                      action.riskLevel <= 2 ? "text-success" :
+                      action.riskLevel <= 3 ? "text-warning" :
                       "text-destructive"
                     )} />
                   </div>
@@ -372,14 +348,14 @@ export function CompetitionPanel({
                     Coût: <span className="text-foreground font-medium">{formatCurrency(action.cost)}</span>
                   </span>
                   <span className="text-muted-foreground">
-                    Succès: <span className="text-foreground font-medium">{(action.successRate * 100)}%</span>
+                    Succès: <span className="text-foreground font-medium">{action.successRate}%</span>
                   </span>
                   <span className={cn(
-                    action.risk === 'low' ? "text-success" :
-                    action.risk === 'medium' ? "text-warning" :
+                    action.riskLevel <= 2 ? "text-success" :
+                    action.riskLevel <= 3 ? "text-warning" :
                     "text-destructive"
                   )}>
-                    Risque {action.risk === 'low' ? 'faible' : action.risk === 'medium' ? 'moyen' : 'élevé'}
+                    Risque {action.riskLevel}/5
                   </span>
                 </div>
                 <button
@@ -410,7 +386,7 @@ export function CompetitionPanel({
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Lancez des actions stratégiques pour gagner des parts de marché et affaiblir vos concurrents.
+          Lancez des actions stratégiques pour gagner des parts de marché.
         </p>
         
         <div className="grid gap-3">
@@ -429,11 +405,9 @@ export function CompetitionPanel({
                   <div className="flex-1">
                     <h4 className="font-semibold">{action.name}</h4>
                     <p className="text-sm text-muted-foreground mb-2">{action.description}</p>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="px-2 py-0.5 bg-primary/20 text-primary rounded">
-                        {action.impact}
-                      </span>
-                    </div>
+                    <span className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded">
+                      {action.impact}
+                    </span>
                   </div>
                   <div className="text-right ml-4">
                     <div className="font-semibold">{formatCurrency(action.cost)}</div>

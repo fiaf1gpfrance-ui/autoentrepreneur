@@ -1,17 +1,14 @@
 import { useState } from "react";
-import { Company, GameEvent } from "@/types/game";
+import { Company, GameState } from "@/types/game";
 import { 
   RichEvent, 
   EconomicNews,
   EVENT_TEMPLATES,
-  ECONOMIC_NEWS_TEMPLATES,
 } from "@/types/events";
 import { 
-  generateRichEvent,
-  applyEventChoice,
-  generateEconomicNews,
   checkMilestones,
-  getEventSeverityStyle,
+  getEventSeverityBg,
+  getEventSeverityColor,
 } from "@/utils/richEventsEngine";
 import { formatCurrency } from "@/utils/gameEngine";
 import { 
@@ -25,8 +22,6 @@ import {
   TrendingUp,
   TrendingDown,
   AlertCircle,
-  CheckCircle,
-  XCircle,
   Info,
   Sparkles,
 } from "lucide-react";
@@ -35,7 +30,7 @@ import { toast } from "sonner";
 
 interface RichEventsPanelProps {
   company: Company;
-  day: number;
+  gameState: GameState;
   activeEvents: RichEvent[];
   economicNews: EconomicNews[];
   onEventChoice: (eventId: string, choiceId: string, effects: any) => void;
@@ -44,7 +39,7 @@ interface RichEventsPanelProps {
 
 export function RichEventsPanel({ 
   company, 
-  day,
+  gameState,
   activeEvents,
   economicNews,
   onEventChoice,
@@ -55,7 +50,7 @@ export function RichEventsPanel({
 
   const handleChoice = (eventId: string, choiceId: string) => {
     const event = activeEvents.find(e => e.id === eventId);
-    if (!event) return;
+    if (!event || !event.choices) return;
 
     const choice = event.choices.find(c => c.id === choiceId);
     if (!choice) return;
@@ -77,42 +72,35 @@ export function RichEventsPanel({
     }
 
     onEventChoice(eventId, choiceId, choice.effects);
-    toast.success(choice.outcome || 'Choix effectué !');
+    toast.success('Choix effectué !');
   };
 
   const getSeverityIcon = (severity: RichEvent['severity']) => {
     switch (severity) {
       case 'positive': return Sparkles;
       case 'neutral': return Info;
-      case 'warning': return AlertTriangle;
+      case 'negative': return AlertTriangle;
       case 'critical': return AlertCircle;
       default: return Info;
     }
   };
 
-  const milestones = checkMilestones(company, day);
+  const milestone = checkMilestones(company, gameState);
 
   return (
     <div className="space-y-6">
       {/* Milestones */}
-      {milestones.length > 0 && (
-        <div className="space-y-3">
-          {milestones.map((milestone, index) => (
-            <div
-              key={index}
-              className="bg-gradient-to-r from-amber-500/20 to-amber-500/5 border border-amber-500/30 rounded-xl p-4 animate-fade-in"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                  <Trophy className="w-5 h-5 text-amber-500" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-amber-500">{milestone.title}</h4>
-                  <p className="text-sm text-muted-foreground">{milestone.description}</p>
-                </div>
-              </div>
+      {milestone && (
+        <div className="bg-gradient-to-r from-amber-500/20 to-amber-500/5 border border-amber-500/30 rounded-xl p-4 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+              <Trophy className="w-5 h-5 text-amber-500" />
             </div>
-          ))}
+            <div>
+              <h4 className="font-semibold text-amber-500">{milestone.title}</h4>
+              <p className="text-sm text-muted-foreground">{milestone.description}</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -127,27 +115,25 @@ export function RichEventsPanel({
           <div className="space-y-3">
             {activeEvents.map(event => {
               const SeverityIcon = getSeverityIcon(event.severity);
-              const style = getEventSeverityStyle(event.severity);
+              const bgStyle = getEventSeverityBg(event.severity);
+              const textStyle = getEventSeverityColor(event.severity);
               const isSelected = selectedEventId === event.id;
-              const isExpired = event.expiresAt && day > event.expiresAt;
+              const isExpired = event.expiresAt && gameState.day > event.expiresAt;
               
               return (
                 <div
                   key={event.id}
                   className={cn(
-                    "game-panel p-4 transition-all cursor-pointer",
-                    style.border,
+                    "game-panel p-4 transition-all cursor-pointer border",
+                    bgStyle,
                     isSelected && "ring-2 ring-primary",
                     isExpired && "opacity-50"
                   )}
                   onClick={() => setSelectedEventId(isSelected ? null : event.id)}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={cn(
-                      "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
-                      style.bg
-                    )}>
-                      <SeverityIcon className={cn("w-5 h-5", style.text)} />
+                    <div className="w-10 h-10 rounded-full bg-background/50 flex items-center justify-center shrink-0">
+                      <span className="text-xl">{event.icon}</span>
                     </div>
                     
                     <div className="flex-1 min-w-0">
@@ -156,7 +142,7 @@ export function RichEventsPanel({
                         {event.expiresAt && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {event.expiresAt - day} jours
+                            {event.expiresAt - gameState.day} jours
                           </span>
                         )}
                       </div>
@@ -187,15 +173,15 @@ export function RichEventsPanel({
                               {event.immediateEffects.credibility}
                             </span>
                           )}
-                          {event.immediateEffects.moral && (
+                          {event.immediateEffects.moralAll && (
                             <span className={cn(
                               "text-xs px-2 py-0.5 rounded-full",
-                              event.immediateEffects.moral > 0 
+                              event.immediateEffects.moralAll > 0 
                                 ? "bg-success/20 text-success" 
                                 : "bg-destructive/20 text-destructive"
                             )}>
-                              Moral {event.immediateEffects.moral > 0 ? '+' : ''}
-                              {event.immediateEffects.moral}
+                              Moral {event.immediateEffects.moralAll > 0 ? '+' : ''}
+                              {event.immediateEffects.moralAll}
                             </span>
                           )}
                         </div>
@@ -251,12 +237,12 @@ export function RichEventsPanel({
                                       Créd. {choice.effects.credibility > 0 ? '+' : ''}{choice.effects.credibility}
                                     </span>
                                   )}
-                                  {choice.effects.moral && (
+                                  {choice.effects.moralAll && (
                                     <span className={cn(
                                       "text-xs px-1.5 py-0.5 rounded",
-                                      choice.effects.moral > 0 ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"
+                                      choice.effects.moralAll > 0 ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"
                                     )}>
-                                      Moral {choice.effects.moral > 0 ? '+' : ''}{choice.effects.moral}
+                                      Moral {choice.effects.moralAll > 0 ? '+' : ''}{choice.effects.moralAll}
                                     </span>
                                   )}
                                 </div>
@@ -320,22 +306,22 @@ export function RichEventsPanel({
                 >
                   <div className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                    news.impact === 'positive' ? "bg-success/20" :
-                    news.impact === 'negative' ? "bg-destructive/20" :
+                    news.sentiment === 'bullish' ? "bg-success/20" :
+                    news.sentiment === 'bearish' ? "bg-destructive/20" :
                     "bg-muted"
                   )}>
-                    {news.impact === 'positive' ? (
+                    {news.sentiment === 'bullish' ? (
                       <TrendingUp className="w-4 h-4 text-success" />
-                    ) : news.impact === 'negative' ? (
+                    ) : news.sentiment === 'bearish' ? (
                       <TrendingDown className="w-4 h-4 text-destructive" />
                     ) : (
                       <Info className="w-4 h-4 text-muted-foreground" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h5 className="font-medium text-sm">{news.title}</h5>
-                    <p className="text-xs text-muted-foreground">{news.description}</p>
-                    <span className="text-xs text-muted-foreground">Jour {news.day}</span>
+                    <h5 className="font-medium text-sm">{news.headline}</h5>
+                    <p className="text-xs text-muted-foreground">{news.content}</p>
+                    <span className="text-xs text-muted-foreground">{news.source} - Jour {news.date}</span>
                   </div>
                 </div>
               ))}
@@ -345,7 +331,7 @@ export function RichEventsPanel({
       )}
 
       {/* No events */}
-      {activeEvents.length === 0 && milestones.length === 0 && (
+      {activeEvents.length === 0 && !milestone && (
         <div className="text-center py-8 text-muted-foreground">
           <Gift className="w-12 h-12 mx-auto mb-4 opacity-50" />
           <p>Aucun événement actif</p>

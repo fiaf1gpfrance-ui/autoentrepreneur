@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Company } from "@/types/game";
+import { Company, GameState } from "@/types/game";
 import { 
   Investor, 
   FundingRound, 
@@ -13,8 +13,6 @@ import {
   checkInvestorRequirements,
   createFundingRound,
   initializeShareholders,
-  addShareholder,
-  calculateDividend,
   getAvailableFundingRounds,
   updateInvestorUnlocks,
 } from "@/utils/investorEngine";
@@ -38,56 +36,37 @@ import { toast } from "sonner";
 
 interface InvestorsPanelProps {
   company: Company;
-  day: number;
-  onFundingRound: (round: FundingRound) => void;
-  onPayDividends: (amount: number) => void;
+  gameState: GameState;
+  onFundingRound: (amount: number, equity: number, investorIds: string[]) => void;
 }
 
 export function InvestorsPanel({ 
   company, 
-  day,
+  gameState,
   onFundingRound,
-  onPayDividends,
 }: InvestorsPanelProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'investors' | 'funding' | 'shareholders'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'investors' | 'funding'>('overview');
   const [selectedInvestorId, setSelectedInvestorId] = useState<string | null>(null);
 
-  // Initialize data if not present
-  const investors = company.investors || initializeInvestors();
-  const shareholders = company.shareholders || initializeShareholders(company.name);
-  const fundingRounds = company.fundingRounds || [];
-  const valuation = calculateValuation(company, day);
-  const updatedInvestors = updateInvestorUnlocks(investors, company, day);
-  const availableRounds = getAvailableFundingRounds(fundingRounds, company);
+  // Initialize data
+  const investors = initializeInvestors(company);
+  const valuation = calculateValuation(company, gameState);
+  const updatedInvestors = updateInvestorUnlocks(investors, company, gameState);
+  const availableRounds = getAvailableFundingRounds(company, gameState);
 
   const tabs = [
     { id: 'overview', label: 'Vue d\'ensemble', icon: PieChart },
     { id: 'investors', label: 'Investisseurs', icon: Users },
     { id: 'funding', label: 'Levées de fonds', icon: TrendingUp },
-    { id: 'shareholders', label: 'Actionnariat', icon: Building2 },
   ] as const;
 
   const handleStartFundingRound = (roundType: FundingRound['type']) => {
     const config = FUNDING_ROUND_CONFIGS[roundType];
-    const round = createFundingRound(roundType, company, valuation, day);
+    const amount = (config.typicalAmount.min + config.typicalAmount.max) / 2;
+    const equity = (config.typicalEquity.min + config.typicalEquity.max) / 2;
     
-    if (!round) {
-      toast.error("Impossible de lancer cette levée de fonds");
-      return;
-    }
-    
-    onFundingRound(round);
-    toast.success(`Levée de fonds ${config.name} lancée ! Objectif: ${formatCurrency(round.targetAmount)}`);
-  };
-
-  const handlePayDividends = () => {
-    const totalDividend = calculateDividend(company, shareholders);
-    if (company.treasury < totalDividend) {
-      toast.error("Trésorerie insuffisante pour verser les dividendes");
-      return;
-    }
-    onPayDividends(totalDividend);
-    toast.success(`Dividendes versés: ${formatCurrency(totalDividend)}`);
+    onFundingRound(amount, equity, []);
+    toast.success(`Levée de fonds ${config.name} lancée ! Montant: ${formatCurrency(amount)}`);
   };
 
   const renderOverview = () => (
@@ -99,28 +78,27 @@ export function InvestorsPanel({
             <TrendingUp className="w-5 h-5 text-primary" />
             Valorisation estimée
           </h3>
-          <span className="text-xs text-muted-foreground">Mise à jour quotidienne</span>
+          <span className="text-xs text-muted-foreground">Méthode: {valuation.method}</span>
         </div>
-        <div className="text-3xl font-display font-bold text-primary mb-2">
-          {formatCurrency(valuation.current)}
+        <div className="text-3xl font-display font-bold text-primary mb-4">
+          {formatCurrency(valuation.preMoneyValuation)}
         </div>
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="text-muted-foreground">Multiple revenus</span>
-            <div className="font-semibold">{valuation.revenueMultiple.toFixed(1)}x</div>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Score croissance</span>
-            <div className="font-semibold">{valuation.growthScore}/100</div>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Prime marché</span>
-            <div className={cn(
-              "font-semibold",
-              valuation.marketPremium > 0 ? "text-success" : "text-destructive"
-            )}>
-              {valuation.marketPremium > 0 ? '+' : ''}{(valuation.marketPremium * 100).toFixed(0)}%
-            </div>
+        
+        {/* Factors */}
+        <div className="space-y-2">
+          <span className="text-sm text-muted-foreground">Facteurs d'évaluation:</span>
+          <div className="flex flex-wrap gap-2">
+            {valuation.factors.map((factor, idx) => (
+              <span 
+                key={idx}
+                className={cn(
+                  "text-xs px-2 py-1 rounded-full",
+                  factor.positive ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"
+                )}
+              >
+                {factor.positive ? '+' : ''}{factor.impact}% {factor.name}
+              </span>
+            ))}
           </div>
         </div>
       </div>
@@ -130,7 +108,7 @@ export function InvestorsPanel({
         <div className="game-panel p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <Users className="w-4 h-4" />
-            <span className="text-sm">Investisseurs débloqués</span>
+            <span className="text-sm">Investisseurs disponibles</span>
           </div>
           <div className="text-2xl font-bold">
             {updatedInvestors.filter(i => i.unlocked).length} / {updatedInvestors.length}
@@ -138,11 +116,11 @@ export function InvestorsPanel({
         </div>
         <div className="game-panel p-4">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
-            <Coins className="w-4 h-4" />
-            <span className="text-sm">Total levé</span>
+            <Target className="w-4 h-4" />
+            <span className="text-sm">Levées disponibles</span>
           </div>
           <div className="text-2xl font-bold">
-            {formatCurrency(fundingRounds.filter(r => r.closed).reduce((sum, r) => sum + r.raisedAmount, 0))}
+            {availableRounds.length}
           </div>
         </div>
       </div>
@@ -151,7 +129,7 @@ export function InvestorsPanel({
       {availableRounds.length > 0 && (
         <div className="game-panel p-4">
           <h3 className="font-display font-semibold mb-4 flex items-center gap-2">
-            <Target className="w-4 h-4" />
+            <Coins className="w-4 h-4" />
             Levées disponibles
           </h3>
           <div className="space-y-2">
@@ -166,7 +144,7 @@ export function InvestorsPanel({
                   <div>
                     <span className="font-semibold">{config.name}</span>
                     <span className="text-sm text-muted-foreground ml-2">
-                      Dilution: {(config.typicalDilution * 100).toFixed(0)}%
+                      {formatCurrency(config.typicalAmount.min)} - {formatCurrency(config.typicalAmount.max)}
                     </span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-primary" />
@@ -183,7 +161,7 @@ export function InvestorsPanel({
     <div className="space-y-4">
       <div className="grid gap-3">
         {updatedInvestors.map(investor => {
-          const canInvest = checkInvestorRequirements(investor, company, day);
+          const checkResult = checkInvestorRequirements(investor, company, gameState);
           
           return (
             <div
@@ -199,50 +177,52 @@ export function InvestorsPanel({
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  {investor.unlocked ? (
-                    <Unlock className="w-5 h-5 text-success" />
-                  ) : (
-                    <Lock className="w-5 h-5 text-muted-foreground" />
-                  )}
+                  <span className="text-2xl">{investor.avatar}</span>
                   <div>
                     <h4 className="font-semibold">{investor.name}</h4>
                     <span className={cn(
                       "text-xs px-2 py-0.5 rounded-full",
                       investor.type === 'angel' ? "bg-amber-500/20 text-amber-500" :
-                      investor.type === 'vc' ? "bg-blue-500/20 text-blue-500" :
+                      investor.type.startsWith('vc') ? "bg-blue-500/20 text-blue-500" :
                       investor.type === 'corporate' ? "bg-purple-500/20 text-purple-500" :
                       "bg-green-500/20 text-green-500"
                     )}>
                       {investor.type === 'angel' ? 'Business Angel' :
-                       investor.type === 'vc' ? 'Capital-Risque' :
-                       investor.type === 'corporate' ? 'Corporate VC' : 'Fonds PE'}
+                       investor.type.startsWith('vc') ? 'Capital-Risque' :
+                       investor.type === 'corporate' ? 'Corporate VC' : 'Crowdfunding'}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className={cn(
-                        "w-3 h-3",
-                        i < investor.reputation ? "text-amber-400 fill-amber-400" : "text-muted-foreground"
-                      )}
-                    />
-                  ))}
+                  {investor.unlocked ? (
+                    <Unlock className="w-4 h-4 text-success" />
+                  ) : (
+                    <Lock className="w-4 h-4 text-muted-foreground" />
+                  )}
                 </div>
               </div>
 
-              <p className="text-sm text-muted-foreground mb-3">{investor.description}</p>
-
               <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                 <div className="bg-secondary/50 rounded p-2">
-                  <span className="text-muted-foreground">Ticket min</span>
-                  <div className="font-semibold">{formatCurrency(investor.minInvestment)}</div>
+                  <span className="text-muted-foreground">Ticket</span>
+                  <div className="font-semibold">
+                    {formatCurrency(investor.investmentRange.min)} - {formatCurrency(investor.investmentRange.max)}
+                  </div>
                 </div>
                 <div className="bg-secondary/50 rounded p-2">
-                  <span className="text-muted-foreground">Ticket max</span>
-                  <div className="font-semibold">{formatCurrency(investor.maxInvestment)}</div>
+                  <span className="text-muted-foreground">Equity attendu</span>
+                  <div className="font-semibold">
+                    {investor.equityExpected.min}% - {investor.equityExpected.max}%
+                  </div>
                 </div>
+              </div>
+
+              <div className="flex flex-wrap gap-1 mb-3">
+                {investor.focus.map((sector, idx) => (
+                  <span key={idx} className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded">
+                    {sector}
+                  </span>
+                ))}
               </div>
 
               {!investor.unlocked && (
@@ -252,28 +232,17 @@ export function InvestorsPanel({
                     <span className="font-semibold">Conditions de déblocage:</span>
                   </div>
                   <ul className="text-muted-foreground space-y-0.5">
-                    {investor.requirements.minRevenue && (
-                      <li>• CA min: {formatCurrency(investor.requirements.minRevenue)}/mois</li>
-                    )}
-                    {investor.requirements.minEmployees && (
-                      <li>• Employés min: {investor.requirements.minEmployees}</li>
-                    )}
-                    {investor.requirements.minValuation && (
-                      <li>• Valorisation min: {formatCurrency(investor.requirements.minValuation)}</li>
-                    )}
-                    {investor.requirements.sectors && (
-                      <li>• Secteurs: {investor.requirements.sectors.join(', ')}</li>
-                    )}
+                    {investor.requirements.map((req, idx) => (
+                      <li key={idx}>• {req.description}</li>
+                    ))}
                   </ul>
                 </div>
               )}
 
-              {investor.unlocked && canInvest && (
-                <div className="flex gap-2 mt-3">
-                  <button className="flex-1 btn-game-primary text-sm py-2">
-                    Contacter
-                  </button>
-                </div>
+              {investor.unlocked && checkResult.eligible && (
+                <button className="w-full btn-game-primary text-sm py-2 mt-2">
+                  Contacter l'investisseur
+                </button>
               )}
             </div>
           );
@@ -284,116 +253,59 @@ export function InvestorsPanel({
 
   const renderFunding = () => (
     <div className="space-y-6">
-      {/* Active Rounds */}
-      {fundingRounds.filter(r => !r.closed).length > 0 && (
-        <div className="game-panel p-4">
-          <h3 className="font-display font-semibold mb-4">Levées en cours</h3>
-          <div className="space-y-3">
-            {fundingRounds.filter(r => !r.closed).map(round => (
-              <div key={round.id} className="bg-secondary/50 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold">{FUNDING_ROUND_CONFIGS[round.type].name}</span>
-                  <span className="text-sm text-primary">
-                    {((round.raisedAmount / round.targetAmount) * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <div className="w-full bg-secondary rounded-full h-2 mb-2">
-                  <div 
-                    className="bg-primary rounded-full h-2 transition-all"
-                    style={{ width: `${Math.min(100, (round.raisedAmount / round.targetAmount) * 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{formatCurrency(round.raisedAmount)} levés</span>
-                  <span>Objectif: {formatCurrency(round.targetAmount)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <p className="text-sm text-muted-foreground">
+        Les levées de fonds vous permettent d'obtenir du capital en échange d'une partie de votre entreprise.
+      </p>
 
-      {/* Past Rounds */}
-      {fundingRounds.filter(r => r.closed).length > 0 && (
-        <div className="game-panel p-4">
-          <h3 className="font-display font-semibold mb-4">Historique</h3>
-          <div className="space-y-2">
-            {fundingRounds.filter(r => r.closed).map(round => (
-              <div key={round.id} className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
-                <div>
-                  <span className="font-semibold">{FUNDING_ROUND_CONFIGS[round.type].name}</span>
-                  <span className="text-sm text-muted-foreground ml-2">
-                    Jour {round.closedDate}
+      <div className="space-y-3">
+        {Object.entries(FUNDING_ROUND_CONFIGS).map(([key, config]) => {
+          const isAvailable = availableRounds.includes(key as FundingRound['type']);
+          
+          return (
+            <div
+              key={key}
+              className={cn(
+                "game-panel p-4",
+                !isAvailable && "opacity-50"
+              )}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold">{config.name}</h4>
+                {isAvailable ? (
+                  <span className="text-xs px-2 py-0.5 bg-success/20 text-success rounded-full">
+                    Disponible
                   </span>
+                ) : (
+                  <span className="text-xs px-2 py-0.5 bg-muted text-muted-foreground rounded-full">
+                    Non disponible
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Montant typique:</span>
+                  <div className="font-medium">
+                    {formatCurrency(config.typicalAmount.min)} - {formatCurrency(config.typicalAmount.max)}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-semibold text-success">{formatCurrency(round.raisedAmount)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    Valo: {formatCurrency(round.postMoneyValuation)}
+                <div>
+                  <span className="text-muted-foreground">Equity:</span>
+                  <div className="font-medium">
+                    {config.typicalEquity.min}% - {config.typicalEquity.max}%
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* No Rounds Yet */}
-      {fundingRounds.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>Aucune levée de fonds effectuée</p>
-          <p className="text-sm mt-2">Utilisez l'onglet Vue d'ensemble pour lancer votre première levée</p>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderShareholders = () => (
-    <div className="space-y-6">
-      {/* Ownership Chart */}
-      <div className="game-panel p-4">
-        <h3 className="font-display font-semibold mb-4">Répartition du capital</h3>
-        <div className="space-y-3">
-          {shareholders.map((holder, index) => {
-            const colors = ['bg-primary', 'bg-blue-500', 'bg-purple-500', 'bg-amber-500', 'bg-green-500'];
-            return (
-              <div key={holder.id}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium">{holder.name}</span>
-                  <span className="text-sm font-bold">{(holder.percentage * 100).toFixed(1)}%</span>
-                </div>
-                <div className="w-full bg-secondary rounded-full h-3">
-                  <div 
-                    className={cn("rounded-full h-3 transition-all", colors[index % colors.length])}
-                    style={{ width: `${holder.percentage * 100}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>{holder.shares.toLocaleString()} actions</span>
-                  <span>Entrée: Jour {holder.entryDate}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Dividends */}
-      <div className="game-panel p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-display font-semibold">Dividendes</h3>
-          <button
-            onClick={handlePayDividends}
-            disabled={company.treasury < calculateDividend(company, shareholders)}
-            className="btn-game-primary text-sm py-2 px-4 disabled:opacity-50"
-          >
-            Verser les dividendes
-          </button>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Montant estimé: {formatCurrency(calculateDividend(company, shareholders))}
-        </p>
+              {isAvailable && (
+                <button
+                  onClick={() => handleStartFundingRound(key as FundingRound['type'])}
+                  className="w-full btn-game-primary text-sm py-2 mt-3"
+                >
+                  Lancer la levée
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -428,7 +340,6 @@ export function InvestorsPanel({
       {activeTab === 'overview' && renderOverview()}
       {activeTab === 'investors' && renderInvestors()}
       {activeTab === 'funding' && renderFunding()}
-      {activeTab === 'shareholders' && renderShareholders()}
     </div>
   );
 }
