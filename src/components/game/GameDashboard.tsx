@@ -62,6 +62,10 @@ import { AdvancedProductionPanel } from "./AdvancedProductionPanel";
 import { AdvancedCommercialPanel } from "./AdvancedCommercialPanel";
 import { SalesPipelinePanel } from "./SalesPipelinePanel";
 import { SaveLoadPanel } from "./SaveLoadPanel";
+import { Taskbar } from "./Taskbar";
+import { AppWindow } from "./AppWindow";
+import { DesktopIcon } from "./DesktopIcon";
+import { DesktopOverview } from "./DesktopOverview";
 import { GameSave } from "@/hooks/useGameSave";
 import { GameSettings } from "./CompanySetup";
 import { InvestorsPanel } from "./InvestorsPanel";
@@ -1079,637 +1083,256 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'gameplay', label: 'Stats', icon: BarChart3 },
   ];
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="font-display font-bold text-lg">{company.name}</h1>
-              <div className={cn("flex items-center gap-1.5 text-sm", weather.color)}>
-                <WeatherIcon className="w-4 h-4" />
-                <span>{weather.label}</span>
-              </div>
-            </div>
+  // Get icon colors for variety
+  const getIconColor = (id: string): string => {
+    const colors: Record<string, string> = {
+      overview: "text-primary",
+      shop: "text-amber-400",
+      progression: "text-yellow-400",
+      achievements: "text-amber-500",
+      investors: "text-green-400",
+      competition: "text-red-400",
+      richevents: "text-purple-400",
+      marketing: "text-pink-400",
+      technology: "text-cyan-400",
+      crises: "text-orange-500",
+      banking: "text-emerald-400",
+      ultrafinance: "text-teal-400",
+      realestate: "text-blue-400",
+      supply: "text-indigo-400",
+      advancedproduction: "text-violet-400",
+      rh: "text-rose-400",
+      hradvanced: "text-fuchsia-400",
+      products: "text-lime-400",
+      advancedcommercial: "text-sky-400",
+      salespipeline: "text-cyan-500",
+      international: "text-blue-500",
+      advancedinternational: "text-indigo-500",
+      legal: "text-slate-400",
+      taxes: "text-gray-400",
+      gameplay: "text-zinc-400",
+    };
+    return colors[id] || "text-primary";
+  };
 
-            <div className="flex items-center gap-3">
-              {/* Currency display */}
-              <div className="flex items-center gap-1.5 bg-amber-500/20 px-2.5 py-1 rounded-full">
-                <Coins className="w-4 h-4 text-amber-400" />
-                <span className="font-bold text-amber-400 text-sm">{company.coins?.toLocaleString() || 0}</span>
-              </div>
-              <div className="flex items-center gap-1.5 bg-purple-500/20 px-2.5 py-1 rounded-full">
-                <Gem className="w-4 h-4 text-purple-400" />
-                <span className="font-bold text-purple-400 text-sm">{company.gems || 0}</span>
-              </div>
-              
-              {/* Daily reward button */}
-              {canClaimDailyReward(company, gameState.day) && (
-                <button 
-                  onClick={claimDailyRewardAction}
-                  className="flex items-center gap-1.5 bg-success/20 hover:bg-success/30 px-2.5 py-1 rounded-full transition-colors animate-pulse"
-                >
-                  <Gift className="w-4 h-4 text-success" />
-                  <span className="font-bold text-success text-xs">Récompense!</span>
-                </button>
-              )}
-              
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4" />
-                <span>J{gameState.day} M{gameState.month} A{gameState.year}</span>
-              </div>
-            </div>
+  // Open apps for taskbar (currently active app)
+  const openApps = activeTab ? [tabs.find(t => t.id === activeTab)!].filter(Boolean).map(t => ({
+    ...t,
+    color: getIconColor(t.id)
+  })) : [];
 
-            <div className="flex items-center gap-2">
-              <button onClick={() => setSpeed(1)} className={cn("p-2 rounded-lg transition-colors", gameState.gameSpeed === 1 ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80")}>
-                <Play className="w-4 h-4" />
+  const renderAppContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return <DesktopOverview company={company} gameState={gameState} onDismissEvent={dismissEvent} />;
+
+      case 'rh':
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold">Ressources Humaines</h2>
+              <button onClick={hireEmployee} className="btn-game-primary text-sm flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Recruter
               </button>
-              <button onClick={() => setSpeed(2)} className={cn("p-2 rounded-lg transition-colors", gameState.gameSpeed === 2 ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80")}>
-                <FastForward className="w-4 h-4" />
-              </button>
-              <button onClick={() => setSpeed(3)} className={cn("p-2 rounded-lg transition-colors", gameState.gameSpeed === 3 ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-secondary/80")}>
-                <FastForward className="w-4 h-4" /><FastForward className="w-4 h-4 -ml-2" />
-              </button>
-              <button onClick={togglePause} className={cn("p-2 rounded-lg transition-colors", gameState.isPaused ? "bg-warning text-warning-foreground" : "bg-secondary hover:bg-secondary/80")}>
-                {gameState.isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-              </button>
-              <button onClick={handleSave} className="p-2 rounded-lg bg-secondary hover:bg-secondary/80"><Save className="w-4 h-4" /></button>
-              <button onClick={onReset} className="p-2 rounded-lg bg-secondary hover:bg-secondary/80 text-destructive"><RotateCcw className="w-4 h-4" /></button>
             </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Main Stats Row */}
-          <div className="col-span-12 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Trésorerie" value={formatCurrency(company.treasury)} icon={Wallet} colorClass={company.treasury >= 0 ? "text-success" : "text-destructive"} subValue={`BFR: ${formatCurrency(bfr)}`} />
-            <StatCard label="CA Mensuel" value={formatCurrency(company.monthlyRevenue)} icon={TrendingUp} colorClass="text-success" subValue={`Dépenses: ${formatCurrency(company.monthlyExpenses)}`} />
-            <StatCard label="Crédibilité" value={`${Math.round(company.credibility)}/100`} icon={Shield} colorClass={getCredibilityColor(company.credibility)} subValue="Réputation sociale" />
-            <StatCard label="Moral Équipe" value={formatPercent(avgMoral)} icon={Heart} colorClass={getMoralColor(avgMoral)} subValue={`${company.employees.length} employé(s)`} />
-          </div>
-
-          {/* Gauges & Events */}
-          <div className="col-span-12 md:col-span-8">
-            <div className="game-panel space-y-4">
-              <h2 className="font-display font-semibold">Indicateurs Clés</h2>
-              <div className="grid grid-cols-2 gap-6">
-                <GaugeBar value={company.credibility} label="Crédibilité" colorClass={company.credibility >= 80 ? "bg-success" : company.credibility >= 50 ? "bg-warning" : "bg-destructive"} />
-                <GaugeBar value={avgMoral} label="Moral Global" colorClass={avgMoral >= 70 ? "bg-success" : avgMoral >= 40 ? "bg-warning" : "bg-destructive"} />
-              </div>
-              <div className="grid grid-cols-3 gap-4 text-center pt-4 border-t border-border">
-                <div><p className="data-label">Coût Salarial</p><p className="text-lg font-bold text-destructive">{formatCurrency(totalSalaryCost)}/mois</p></div>
-                <div><p className="data-label">TVA Due</p><p className="text-lg font-bold text-warning">{formatCurrency(tvaDue)}</p></div>
-                <div><p className="data-label">Marge Secteur</p><p className="text-lg font-bold text-primary">x{SECTOR_MODIFIERS[company.sector].marginMultiplier.toFixed(1)}</p></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-span-12 md:col-span-4">
-            <div className="game-panel space-y-3">
-              <h2 className="font-display font-semibold">Événements</h2>
-              {gameState.activeEvents.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Aucun événement en cours</p>
-              ) : (
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {gameState.activeEvents.map(event => (
-                    <EventCard key={event.id} event={event} onDismiss={dismissEvent} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="col-span-12">
-            <div className="flex gap-1 flex-wrap border-b border-border pb-2 mb-4">
-              {tabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabId)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
-                    activeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                  )}
-                >
-                  <tab.icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {company.employees.map(employee => (
+                <EmployeeCard key={employee.id} employee={employee} onFire={fireEmployee} />
               ))}
+              {company.employees.length === 0 && (
+                <p className="text-muted-foreground col-span-full text-center py-8">Aucun employé. Recrutez votre premier talent !</p>
+              )}
             </div>
-
-            {/* Tab Content */}
-            {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {company.employees.slice(0, 3).map(employee => (<EmployeeCard key={employee.id} employee={employee} />))}
-                {company.products.slice(0, 3).map(product => (<ProductCard key={product.id} product={product} />))}
-              </div>
-            )}
-
-            {activeTab === 'achievements' && (
-              <AchievementsPanel
-                achievements={company.achievements}
-                missions={company.missions}
-              />
-            )}
-
-            {activeTab === 'investors' && (
-              <InvestorsPanel
-                company={company}
-                gameState={gameState}
-                onFundingRound={(amount, equity, investorIds) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      treasury: prev.company!.treasury + amount,
-                      capital: prev.company!.capital + amount,
-                    },
-                  }));
-                  toast.success(`Levée de fonds réussie: ${formatCurrency(amount)} pour ${equity}% d'equity !`);
-                }}
-              />
-            )}
-
-            {activeTab === 'competition' && (
-              <CompetitionPanel
-                company={company}
-                day={gameState.day}
-                onEspionage={(actionId, targetId, cost) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      treasury: prev.company!.treasury - cost,
-                    },
-                  }));
-                  toast.success(`Action de renseignement lancée !`);
-                }}
-                onCompetitiveAction={(action, cost) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      treasury: prev.company!.treasury - cost,
-                      marketShare: Math.min(100, prev.company!.marketShare + 2),
-                    },
-                  }));
-                  toast.success(`Action compétitive "${action}" lancée !`);
-                }}
-              />
-            )}
-
-            {activeTab === 'richevents' && (
-              <RichEventsPanel
-                company={company}
-                gameState={gameState}
-                activeEvents={[]}
-                economicNews={[]}
-                onEventChoice={(eventId, choiceId, effects) => {
-                  if (effects.treasury) {
-                    setGameState(prev => ({
-                      ...prev,
-                      company: {
-                        ...prev.company!,
-                        treasury: prev.company!.treasury + effects.treasury,
-                        credibility: effects.credibility 
-                          ? Math.max(0, Math.min(100, prev.company!.credibility + effects.credibility))
-                          : prev.company!.credibility,
-                      },
-                    }));
-                  }
-                }}
-                onDismissEvent={(eventId) => {
-                  toast.info(`Événement fermé`);
-                }}
-              />
-            )}
-
-            {activeTab === 'marketing' && (
-              <MarketingPanel
-                campaigns={company.marketingCampaigns}
-                treasury={company.treasury}
-                reputation={company.reputation}
-                onLaunchCampaign={handleLaunchCampaign}
-                onPauseCampaign={handlePauseCampaign}
-              />
-            )}
-
-            {activeTab === 'technology' && (
-              <TechnologyPanel
-                technologies={company.technologies}
-                treasury={company.treasury}
-                onStartResearch={handleStartResearch}
-                onCancelResearch={handleCancelResearch}
-              />
-            )}
-
-            {activeTab === 'crises' && (
-              <CrisesPanel
-                activeCrises={company.activeCrises}
-                resolvedCrises={company.resolvedCrises}
-                treasury={company.treasury}
-                onRespondToCrisis={handleRespondToCrisis}
-              />
-            )}
-
-            {activeTab === 'banking' && (
-              <BankingPanel
-                bankAccount={company.bankAccount}
-                treasury={company.treasury}
-                monthlyRevenue={company.monthlyRevenue}
-                onRequestLoan={handleRequestLoan}
-                onRequestOverdraft={handleRequestOverdraft}
-                onCreateInvestment={handleCreateInvestment}
-                onLiquidateInvestment={handleLiquidateInvestment}
-                onChangeBank={handleChangeBank}
-              />
-            )}
-
-            {activeTab === 'realestate' && (
-              <RealEstatePanel
-                properties={company.properties}
-                treasury={company.treasury}
-                employeeCount={company.employees.length}
-                onBuyProperty={handleBuyProperty}
-                onRentProperty={handleRentProperty}
-                onSellProperty={handleSellProperty}
-                onMaintenance={handleMaintenance}
-              />
-            )}
-
-            {activeTab === 'supply' && (
-              <SupplyChainPanel
-                suppliers={company.suppliers}
-                inventory={company.inventory}
-                clients={company.clients}
-                invoices={company.invoices}
-                treasury={company.treasury}
-                onAddSupplier={handleAddSupplier}
-                onOrderInventory={() => {}}
-                onAddClient={() => {}}
-                onCreateContract={() => {}}
-                onPayInvoice={() => {}}
-              />
-            )}
-
-            {activeTab === 'rh' && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-display font-semibold">Équipe ({company.employees.length})</h3>
-                  <button onClick={hireEmployee} className="btn-game-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" />Recruter (2 000€)
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {company.employees.map(employee => (<EmployeeCard key={employee.id} employee={employee} onFire={fireEmployee} />))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'hradvanced' && (
-              <HRAdvancedPanel
-                employees={company.employees}
-                socialBenefits={company.socialBenefits}
-                unions={company.unions}
-                treasury={company.treasury}
-                onStartTraining={handleStartTraining}
-                onToggleBenefit={handleToggleBenefit}
-                onNegotiateUnion={handleNegotiateUnion}
-                onPromoteEmployee={handlePromoteEmployee}
-                onGiveRaise={handleGiveRaise}
-              />
-            )}
-
-            {activeTab === 'products' && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-display font-semibold">Catalogue ({company.products.length})</h3>
-                  <button onClick={addProduct} className="btn-game-primary flex items-center gap-2">
-                    <Plus className="w-4 h-4" />Nouveau produit (10 000€)
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {company.products.map(product => (<ProductCard key={product.id} product={product} onUpdatePrice={updateProductPrice} onUpdateMarketing={updateProductMarketing} />))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'international' && (
-              <InternationalPanel
-                foreignMarkets={company.foreignMarkets}
-                subsidiaries={company.subsidiaries}
-                exchangeRates={gameState.exchangeRates}
-                treasury={company.treasury}
-                companyReputation={company.reputation}
-                canExport={canExport}
-                onEnterMarket={handleEnterMarket}
-                onCreateSubsidiary={handleCreateSubsidiary}
-                onInvestInMarket={handleInvestInMarket}
-                onInvestInSubsidiary={handleInvestInSubsidiary}
-                onEnableProductExport={handleEnableProductExport}
-              />
-            )}
-
-            {activeTab === 'legal' && (
-              <LegalPanel
-                legalCases={company.legalCases}
-                lawyers={company.lawyers}
-                intellectualProperty={company.intellectualProperty}
-                treasury={company.treasury}
-                onHireLawyer={handleHireLawyer}
-                onAssignLawyer={handleAssignLawyer}
-                onRegisterIP={handleRegisterIP}
-              />
-            )}
-
-            {activeTab === 'taxes' && (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-display font-semibold">Déclarations Fiscales</h3>
-                  <div className="text-sm text-muted-foreground">TVA: {formatCurrency(company.tvaCollected)} collectée | {formatCurrency(company.tvaDeductible)} déductible</div>
-                </div>
-                {company.taxDeclarations.filter(d => !d.paid).length === 0 ? (
-                  <div className="game-panel text-center py-8">
-                    <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-muted-foreground">Aucune déclaration en attente</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {company.taxDeclarations.filter(d => !d.paid).map((declaration, i) => (
-                      <TaxDeclarationCard key={i} declaration={declaration} currentDay={gameState.day + (gameState.month - 1) * 30} onPay={payTax} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'gameplay' && (
-              <GameplayPanel
-                financialHistory={company.financialHistory}
-                achievements={company.achievements}
-                competitors={company.competitors}
-                marketShare={company.marketShare}
-              />
-            )}
-
-            {activeTab === 'shop' && (
-              <ShopPanel
-                coins={company.coins || 0}
-                gems={company.gems || 0}
-                purchasedItems={company.purchasedItems || []}
-                onPurchase={(itemId, cost, currency) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      coins: currency === 'coins' ? prev.company!.coins - cost : prev.company!.coins,
-                      gems: currency === 'gems' ? prev.company!.gems - cost : prev.company!.gems,
-                      purchasedItems: [...(prev.company!.purchasedItems || []), itemId],
-                    },
-                  }));
-                  toast.success(`Article acheté !`);
-                }}
-              />
-            )}
-
-            {activeTab === 'progression' && (
-              <ProgressionPanel
-                day={gameState.day}
-                stats={{
-                  totalRevenue: company.monthlyRevenue * gameState.month,
-                  totalProfit: company.treasury,
-                  employeesHired: company.employees.length,
-                  productsLaunched: company.products.length,
-                  countriesExpanded: company.foreignMarkets.length,
-                  achievementsUnlocked: company.achievements.filter(a => a.unlocked).length,
-                  totalPlayTime: gameState.day + (gameState.month - 1) * 30 + (gameState.year - 1) * 365,
-                  highestValuation: company.treasury + company.totalAssets,
-                  companiesCreated: 1,
-                  questsCompleted: 0,
-                  prestigeResets: 0,
-                }}
-              />
-            )}
-
-            {activeTab === 'advancedinternational' && (
-              <AdvancedInternationalPanel
-                treasury={company.treasury}
-                onInvest={(amount, country, mode) => {
-                  if (company.treasury >= amount) {
-                    setGameState(prev => ({
-                      ...prev,
-                      company: {
-                        ...prev.company!,
-                        treasury: prev.company!.treasury - amount,
-                      },
-                    }));
-                    toast.success(`Investissement de ${amount}€ en ${country} via ${mode} !`);
-                  } else {
-                    toast.error("Trésorerie insuffisante");
-                  }
-                }}
-              />
-            )}
-
-            {activeTab === 'ultrafinance' && (
-              <UltraFinancePanel
-                company={company}
-                day={gameState.day}
-                month={gameState.month}
-                year={gameState.year}
-              />
-            )}
-
-            {activeTab === 'advancedproduction' && (
-              <AdvancedProductionPanel
-                company={company}
-                onAddProductionLine={(line) => toast.success(`Ligne ${line.name} créée !`)}
-                onScheduleMaintenance={(lineId) => toast.info(`Maintenance planifiée`)}
-                onOptimizeProcess={(type) => toast.success(`Optimisation ${type} lancée !`)}
-              />
-            )}
-
-            {activeTab === 'advancedcommercial' && (
-              <AdvancedCommercialPanel
-                company={company}
-                onContactClient={(clientId) => toast.success(`Client contacté !`)}
-                onCreateOpportunity={(clientId) => toast.success(`Opportunité créée !`)}
-                onAdvanceOpportunity={(oppId, stage) => toast.success(`Opportunité avancée à ${stage} !`)}
-              />
-            )}
-
-            {activeTab === 'salespipeline' && (
-              <SalesPipelinePanel
-                pipeline={{
-                  leads: company.salesPipeline?.leads || [],
-                  deals: company.salesPipeline?.deals || [],
-                  conversionRates: company.salesPipeline?.conversionRates || {},
-                  averageDealValue: company.salesPipeline?.averageDealValue || 0,
-                  averageSalesCycle: company.salesPipeline?.averageSalesCycle || 30,
-                  winRate: company.salesPipeline?.winRate || 0,
-                }}
-                customerFeedback={company.customerFeedback?.map(f => ({
-                  ...f,
-                  type: f.type as 'nps' | 'csat' | 'review' | 'complaint' | 'suggestion',
-                })) || []}
-                treasury={company.treasury}
-                currentDay={gameState.day}
-                onGenerateLead={(lead) => {
-                  const cost = lead.source === 'referral' ? 0 : 
-                    lead.source === 'website' ? 50 :
-                    lead.source === 'cold_call' ? 100 :
-                    lead.source === 'social_media' ? 200 :
-                    lead.source === 'partnership' ? 500 :
-                    lead.source === 'advertising' ? 1000 : 5000;
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      treasury: prev.company!.treasury - cost,
-                      salesPipeline: {
-                        ...prev.company!.salesPipeline,
-                        leads: [...(prev.company!.salesPipeline?.leads || []), lead],
-                      },
-                    },
-                  }));
-                }}
-                onGenerateLeadBatch={(leads, cost) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      treasury: prev.company!.treasury - cost,
-                      salesPipeline: {
-                        ...prev.company!.salesPipeline,
-                        leads: [...(prev.company!.salesPipeline?.leads || []), ...leads],
-                      },
-                    },
-                  }));
-                }}
-                onQualifyLead={(leadId, qualified, newScore) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      salesPipeline: {
-                        ...prev.company!.salesPipeline,
-                        leads: (prev.company!.salesPipeline?.leads || []).map(l =>
-                          l.id === leadId ? { 
-                            ...l, 
-                            status: qualified ? 'qualified' : 'contacted',
-                            score: newScore 
-                          } : l
-                        ),
-                      },
-                    },
-                  }));
-                }}
-                onConvertToDeaL={(leadId, deal) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      salesPipeline: {
-                        ...prev.company!.salesPipeline,
-                        leads: (prev.company!.salesPipeline?.leads || []).map(l =>
-                          l.id === leadId ? { ...l, status: 'won' } : l
-                        ),
-                        deals: [...(prev.company!.salesPipeline?.deals || []), deal],
-                      },
-                    },
-                  }));
-                }}
-                onAdvanceDeal={(dealId, success) => {
-                  const stages: ('prospecting' | 'qualification' | 'needs_analysis' | 'proposal' | 'negotiation' | 'closing' | 'won')[] = 
-                    ['prospecting', 'qualification', 'needs_analysis', 'proposal', 'negotiation', 'closing', 'won'];
-                  const probabilities: Record<string, number> = {
-                    prospecting: 10, qualification: 20, needs_analysis: 40,
-                    proposal: 60, negotiation: 80, closing: 90, won: 100, lost: 0
-                  };
-                  
-                  setGameState(prev => {
-                    const deals = prev.company!.salesPipeline?.deals || [];
-                    const deal = deals.find(d => d.id === dealId);
-                    if (!deal) return prev;
-                    
-                    let newStage = deal.stage;
-                    let newProbability = deal.probability;
-                    let treasuryChange = 0;
-                    
-                    if (!success) {
-                      newStage = 'lost';
-                      newProbability = 0;
-                    } else {
-                      const currentIndex = stages.indexOf(deal.stage as any);
-                      if (currentIndex < stages.length - 1) {
-                        newStage = stages[currentIndex + 1];
-                        newProbability = probabilities[newStage];
-                        if (newStage === 'won') {
-                          treasuryChange = deal.value;
-                        }
-                      }
-                    }
-                    
-                    return {
-                      ...prev,
-                      company: {
-                        ...prev.company!,
-                        treasury: prev.company!.treasury + treasuryChange,
-                        monthlyRevenue: newStage === 'won' 
-                          ? prev.company!.monthlyRevenue + deal.value / 12 
-                          : prev.company!.monthlyRevenue,
-                        salesPipeline: {
-                          ...prev.company!.salesPipeline,
-                          deals: deals.map(d =>
-                            d.id === dealId ? { ...d, stage: newStage, probability: newProbability } : d
-                          ),
-                          winRate: success && newStage === 'won'
-                            ? Math.round(((prev.company!.salesPipeline?.winRate || 0) * deals.length + 100) / (deals.length + 1))
-                            : prev.company!.salesPipeline?.winRate || 0,
-                        },
-                      },
-                    };
-                  });
-                }}
-                onAddActivity={(dealId, activityType, description) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      salesPipeline: {
-                        ...prev.company!.salesPipeline,
-                        deals: (prev.company!.salesPipeline?.deals || []).map(d =>
-                          d.id === dealId ? {
-                            ...d,
-                            activities: [...d.activities, {
-                              id: `activity_${Date.now()}`,
-                              type: activityType as 'call' | 'email' | 'meeting' | 'demo' | 'proposal' | 'negotiation',
-                              date: gameState.day,
-                              description,
-                            }],
-                          } : d
-                        ),
-                      },
-                    },
-                  }));
-                }}
-                onRecordFeedback={(feedback) => {
-                  setGameState(prev => ({
-                    ...prev,
-                    company: {
-                      ...prev.company!,
-                      customerFeedback: [...(prev.company!.customerFeedback || []), feedback],
-                    },
-                  }));
-                }}
-              />
-            )}
           </div>
+        );
+
+      case 'products':
+        return (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold">Produits & Services</h2>
+              <button onClick={addProduct} className="btn-game-primary text-sm flex items-center gap-2">
+                <Plus className="w-4 h-4" /> Nouveau Produit
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {company.products.map(product => (
+                <ProductCard key={product.id} product={product} onUpdatePrice={updateProductPrice} onUpdateMarketing={updateProductMarketing} />
+              ))}
+              {company.products.length === 0 && (
+                <p className="text-muted-foreground col-span-full text-center py-8">Lancez votre premier produit !</p>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'taxes':
+        return (
+          <div className="space-y-4">
+            <h2 className="font-display text-lg font-semibold">Déclarations Fiscales</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {company.taxDeclarations.map((declaration, i) => (
+                <TaxDeclarationCard key={i} declaration={declaration} onPay={payTax} currentDay={gameState.day} />
+              ))}
+              {company.taxDeclarations.length === 0 && (
+                <p className="text-muted-foreground col-span-full text-center py-8">Aucune déclaration en attente</p>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'shop':
+        return <ShopPanel coins={company.coins || 0} gems={company.gems || 0} purchasedItems={[]} onPurchase={(itemId, cost, currency) => { toast.success('Achat effectué !'); }} />;
+      case 'progression':
+        return <ProgressionPanel day={gameState.day} stats={{ totalRevenue: company.monthlyRevenue * 12, totalEmployeesHired: company.employees.length, totalProductsLaunched: company.products.length }} />;
+      case 'achievements':
+        return <AchievementsPanel achievements={company.achievements} missions={company.missions} />;
+      case 'investors':
+        return <InvestorsPanel company={company} gameState={gameState} onFundingRound={(amount, equity, investorIds) => {
+          setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + amount, capital: prev.company!.capital + amount } }));
+          toast.success(`Levée de fonds réussie: ${formatCurrency(amount)} pour ${equity}% d'equity !`);
+        }} />;
+      case 'competition':
+        return <CompetitionPanel company={company} day={gameState.day} onEspionage={(actionId, targetId, cost) => {
+          setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury - cost } }));
+          toast.success(`Action de renseignement lancée !`);
+        }} onCompetitiveAction={(action, cost) => {
+          setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury - cost, marketShare: Math.min(100, prev.company!.marketShare + 2) } }));
+          toast.success(`Action compétitive "${action}" lancée !`);
+        }} />;
+      case 'richevents':
+        return <RichEventsPanel company={company} gameState={gameState} activeEvents={[]} economicNews={[]} onEventChoice={(eventId, choiceId, effects) => {
+          if (effects.treasury) {
+            setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + effects.treasury, credibility: effects.credibility ? Math.max(0, Math.min(100, prev.company!.credibility + effects.credibility)) : prev.company!.credibility } }));
+          }
+        }} onDismissEvent={(eventId) => toast.info(`Événement fermé`)} />;
+      case 'marketing':
+        return <MarketingPanel campaigns={company.marketingCampaigns} treasury={company.treasury} reputation={company.reputation} onLaunchCampaign={handleLaunchCampaign} onPauseCampaign={handlePauseCampaign} />;
+      case 'technology':
+        return <TechnologyPanel technologies={company.technologies} treasury={company.treasury} onStartResearch={handleStartResearch} onCancelResearch={handleCancelResearch} />;
+      case 'crises':
+        return <CrisesPanel activeCrises={company.activeCrises} resolvedCrises={company.resolvedCrises} treasury={company.treasury} onRespondToCrisis={handleRespondToCrisis} />;
+      case 'banking':
+        return <BankingPanel bankAccount={company.bankAccount} treasury={company.treasury} monthlyRevenue={company.monthlyRevenue} onRequestLoan={handleRequestLoan} onRequestOverdraft={handleRequestOverdraft} onCreateInvestment={handleCreateInvestment} onLiquidateInvestment={handleLiquidateInvestment} onChangeBank={handleChangeBank} />;
+      case 'realestate':
+        return <RealEstatePanel properties={company.properties} treasury={company.treasury} employeeCount={company.employees.length} onBuyProperty={handleBuyProperty} onRentProperty={handleRentProperty} onSellProperty={handleSellProperty} onMaintenance={handleMaintenance} />;
+      case 'supply':
+        return <SupplyChainPanel suppliers={company.suppliers} inventory={company.inventory} clients={company.clients} invoices={company.invoices} treasury={company.treasury} onAddSupplier={handleAddSupplier} />;
+      case 'hradvanced':
+        return <HRAdvancedPanel employees={company.employees} socialBenefits={company.socialBenefits} unions={company.unions} treasury={company.treasury} onStartTraining={handleStartTraining} onToggleBenefit={handleToggleBenefit} onNegotiateUnion={handleNegotiateUnion} onPromoteEmployee={handlePromoteEmployee} onGiveRaise={handleGiveRaise} />;
+      case 'legal':
+        return <LegalPanel lawyers={company.lawyers} legalCases={company.legalCases} intellectualProperty={company.intellectualProperty} treasury={company.treasury} onHireLawyer={handleHireLawyer} onAssignLawyer={handleAssignLawyer} onRegisterIP={handleRegisterIP} />;
+      case 'gameplay':
+        return <GameplayPanel financialHistory={company.financialHistory || []} achievements={company.achievements} competitors={company.competitors || []} marketShare={company.marketShare} />;
+      case 'international':
+        return <InternationalPanel foreignMarkets={company.foreignMarkets} subsidiaries={company.subsidiaries} canExport={canExport} treasury={company.treasury} onEnterMarket={handleEnterMarket} onCreateSubsidiary={handleCreateSubsidiary} onInvestInMarket={handleInvestInMarket} onInvestInSubsidiary={handleInvestInSubsidiary} onEnableProductExport={handleEnableProductExport} />;
+      case 'advancedinternational':
+        return <AdvancedInternationalPanel company={company} currentDay={gameState.day} onInvest={(amount, country, mode) => {
+          if (company.treasury >= amount) {
+            setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury - amount } }));
+            toast.success(`Investissement de ${amount}€ en ${country} via ${mode} !`);
+          } else toast.error("Trésorerie insuffisante");
+        }} />;
+      case 'ultrafinance':
+        return <UltraFinancePanel company={company} day={gameState.day} month={gameState.month} year={gameState.year} />;
+      case 'advancedproduction':
+        return <AdvancedProductionPanel company={company} onAddProductionLine={(line) => toast.success(`Ligne ${line.name} créée !`)} onScheduleMaintenance={(lineId) => toast.info(`Maintenance planifiée`)} onOptimizeProcess={(type) => toast.success(`Optimisation ${type} lancée !`)} />;
+      case 'advancedcommercial':
+        return <AdvancedCommercialPanel company={company} onContactClient={(clientId) => toast.success(`Client contacté !`)} onCreateOpportunity={(clientId) => toast.success(`Opportunité créée !`)} onAdvanceOpportunity={(oppId, stage) => toast.success(`Opportunité avancée à ${stage} !`)} />;
+      case 'salespipeline':
+        return <SalesPipelinePanel pipeline={{ leads: company.salesPipeline?.leads || [], deals: company.salesPipeline?.deals || [], conversionRates: company.salesPipeline?.conversionRates || {}, averageDealValue: company.salesPipeline?.averageDealValue || 0, averageSalesCycle: company.salesPipeline?.averageSalesCycle || 30, winRate: company.salesPipeline?.winRate || 0 }} customerFeedback={company.customerFeedback?.map(f => ({ ...f, type: f.type as 'nps' | 'csat' | 'review' | 'complaint' | 'suggestion' })) || []} treasury={company.treasury} currentDay={gameState.day}
+          onGenerateLead={(lead) => {
+            const cost = lead.source === 'referral' ? 0 : lead.source === 'website' ? 50 : lead.source === 'cold_call' ? 100 : lead.source === 'social_media' ? 200 : lead.source === 'partnership' ? 500 : lead.source === 'advertising' ? 1000 : 5000;
+            setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury - cost, salesPipeline: { ...prev.company!.salesPipeline, leads: [...(prev.company!.salesPipeline?.leads || []), lead] } } }));
+          }}
+          onGenerateLeadBatch={(leads, cost) => setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury - cost, salesPipeline: { ...prev.company!.salesPipeline, leads: [...(prev.company!.salesPipeline?.leads || []), ...leads] } } }))}
+          onQualifyLead={(leadId, qualified, newScore) => setGameState(prev => ({ ...prev, company: { ...prev.company!, salesPipeline: { ...prev.company!.salesPipeline, leads: (prev.company!.salesPipeline?.leads || []).map(l => l.id === leadId ? { ...l, status: qualified ? 'qualified' : 'contacted', score: newScore } : l) } } }))}
+          onConvertToDeaL={(leadId, deal) => setGameState(prev => ({ ...prev, company: { ...prev.company!, salesPipeline: { ...prev.company!.salesPipeline, leads: (prev.company!.salesPipeline?.leads || []).map(l => l.id === leadId ? { ...l, status: 'won' } : l), deals: [...(prev.company!.salesPipeline?.deals || []), deal] } } }))}
+          onAdvanceDeal={(dealId, success) => {
+            const stages: ('prospecting' | 'qualification' | 'needs_analysis' | 'proposal' | 'negotiation' | 'closing' | 'won')[] = ['prospecting', 'qualification', 'needs_analysis', 'proposal', 'negotiation', 'closing', 'won'];
+            const probabilities: Record<string, number> = { prospecting: 10, qualification: 20, needs_analysis: 40, proposal: 60, negotiation: 80, closing: 90, won: 100, lost: 0 };
+            setGameState(prev => {
+              const deals = prev.company!.salesPipeline?.deals || [];
+              const deal = deals.find(d => d.id === dealId);
+              if (!deal) return prev;
+              let newStage = deal.stage;
+              let newProbability = deal.probability;
+              let treasuryChange = 0;
+              if (!success) { newStage = 'lost'; newProbability = 0; }
+              else {
+                const currentIndex = stages.indexOf(deal.stage as any);
+                if (currentIndex < stages.length - 1) { newStage = stages[currentIndex + 1]; newProbability = probabilities[newStage]; if (newStage === 'won') treasuryChange = deal.value; }
+              }
+              return { ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + treasuryChange, monthlyRevenue: newStage === 'won' ? prev.company!.monthlyRevenue + deal.value / 12 : prev.company!.monthlyRevenue, salesPipeline: { ...prev.company!.salesPipeline, deals: deals.map(d => d.id === dealId ? { ...d, stage: newStage, probability: newProbability } : d), winRate: success && newStage === 'won' ? Math.round(((prev.company!.salesPipeline?.winRate || 0) * deals.length + 100) / (deals.length + 1)) : prev.company!.salesPipeline?.winRate || 0 } } };
+            });
+          }}
+          onAddActivity={(dealId, activityType, description) => setGameState(prev => ({ ...prev, company: { ...prev.company!, salesPipeline: { ...prev.company!.salesPipeline, deals: (prev.company!.salesPipeline?.deals || []).map(d => d.id === dealId ? { ...d, activities: [...d.activities, { id: `activity_${Date.now()}`, type: activityType as 'call' | 'email' | 'meeting' | 'demo' | 'proposal' | 'negotiation', date: gameState.day, description }] } : d) } } }))}
+          onRecordFeedback={(feedback) => setGameState(prev => ({ ...prev, company: { ...prev.company!, customerFeedback: [...(prev.company!.customerFeedback || []), feedback] } }))}
+        />;
+      default:
+        return <DesktopOverview company={company} gameState={gameState} onDismissEvent={dismissEvent} />;
+    }
+  };
+
+  const activeTabData = tabs.find(t => t.id === activeTab);
+
+  return (
+    <div className="h-screen flex flex-col bg-gradient-to-br from-background via-background to-secondary/20 overflow-hidden">
+      {/* Desktop Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* App Icons Sidebar */}
+        <div className="w-24 bg-card/30 backdrop-blur-sm border-r border-border/30 py-4 overflow-y-auto flex flex-col gap-1 items-center">
+          {tabs.map(tab => (
+            <DesktopIcon
+              key={tab.id}
+              id={tab.id}
+              label={tab.label}
+              icon={tab.icon}
+              isActive={activeTab === tab.id}
+              onClick={() => setActiveTab(tab.id as TabId)}
+              color={getIconColor(tab.id)}
+            />
+          ))}
+        </div>
+
+        {/* Main App Window Area */}
+        <div className="flex-1 p-4 overflow-hidden">
+          {activeTabData && (
+            <AppWindow
+              id={activeTabData.id}
+              title={activeTabData.label}
+              icon={activeTabData.icon}
+              onClose={() => setActiveTab('overview')}
+              color={getIconColor(activeTabData.id)}
+            >
+              {renderAppContent()}
+            </AppWindow>
+          )}
         </div>
       </div>
+
+      {/* Taskbar */}
+      <Taskbar
+        companyName={company.name}
+        coins={company.coins || 0}
+        gems={company.gems || 0}
+        day={gameState.day}
+        month={gameState.month}
+        year={gameState.year}
+        treasury={company.treasury}
+        isPaused={gameState.isPaused}
+        gameSpeed={gameState.gameSpeed}
+        economicWeather={gameState.economicWeather}
+        canClaimReward={canClaimDailyReward(company, gameState.day)}
+        openApps={openApps}
+        activeAppId={activeTab}
+        onAppClick={(id) => setActiveTab(id as TabId)}
+        onTogglePause={togglePause}
+        onSetSpeed={setSpeed}
+        onSave={handleSave}
+        onReset={onReset}
+        onClaimReward={claimDailyRewardAction}
+      />
 
       {/* Save/Load Panel Modal */}
       {showSavePanel && (
@@ -1717,23 +1340,12 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <SaveLoadPanel
               company={company}
-              gameState={{
-                day: gameState.day,
-                month: gameState.month,
-                year: gameState.year,
-                isPaused: gameState.isPaused,
-                speed: gameState.gameSpeed
-              }}
+              gameState={{ day: gameState.day, month: gameState.month, year: gameState.year, isPaused: gameState.isPaused, speed: gameState.gameSpeed }}
               settings={gameSettings}
               onLoad={handleLoadSave}
               onClose={() => setShowSavePanel(false)}
             />
-            <button
-              onClick={() => setShowSavePanel(false)}
-              className="mt-4 w-full btn-game-secondary"
-            >
-              Fermer
-            </button>
+            <button onClick={() => setShowSavePanel(false)} className="mt-4 w-full btn-game-secondary">Fermer</button>
           </div>
         </div>
       )}
