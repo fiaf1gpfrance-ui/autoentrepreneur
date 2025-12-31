@@ -44,9 +44,9 @@ import {
   CompanyVehicle,
   VehicleModel,
   VehicleCategory,
-  VEHICLE_CATALOG,
   calculateMonthlyVehicleCost,
 } from '@/types/vehicles';
+import { EXTENDED_VEHICLE_CATALOG, CATALOG_STATS } from '@/data/vehicleCatalog';
 import {
   purchaseVehicle,
   assignVehicleToEmployee,
@@ -101,8 +101,8 @@ export function VehicleFleetPanel({
   const stats = useMemo(() => calculateFleetStatistics(fleet), [fleet]);
 
   const filteredCatalog = useMemo(() => {
-    if (selectedCategory === 'all') return VEHICLE_CATALOG;
-    return VEHICLE_CATALOG.filter(v => v.category === selectedCategory);
+    if (selectedCategory === 'all') return EXTENDED_VEHICLE_CATALOG;
+    return EXTENDED_VEHICLE_CATALOG.filter(v => v.category === selectedCategory);
   }, [selectedCategory]);
 
   const filteredVehicles = useMemo(() => {

@@ -216,7 +216,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   // Track max z-index for window focus
   const [maxZIndex, setMaxZIndex] = useState(1);
 
-  // Konami Code: ↑↑↓↓←→←→BA - Protège la crédibilité
+  // Konami Code: ↑↑↓↓←→←→BA - Protège la crédibilité et bordure dorée
   const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
   
   useEffect(() => {
@@ -225,15 +225,50 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
       setKonamiSequence(newSequence);
       
       if (newSequence.length === 10 && newSequence.every((key, i) => key === KONAMI_CODE[i])) {
-        setKonamiActive(true);
-        toast.success('🎮 KONAMI CODE ACTIVÉ ! Crédibilité protégée !', { duration: 5000 });
-        playSound('achievement');
+        if (!konamiActive) {
+          setKonamiActive(true);
+          toast.success('🎮 KONAMI CODE ACTIVÉ ! Mode protégé : crédibilité boostée, faillite impossible !', { duration: 5000 });
+          playSound('achievement');
+        }
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [konamiSequence]);
+  }, [konamiSequence, konamiActive]);
+
+  // Credibility bankruptcy check - only at end of year (day 30, month 12) with 25% chance if credibility < 25
+  // Never triggers if Konami code is active
+  useEffect(() => {
+    if (gameState.gameOver || konamiActive) return;
+    
+    // Check only at year end (month 12, day 30)
+    if (gameState.month === 12 && gameState.day === 30) {
+      const company = gameState.company;
+      if (company && company.credibility < 25) {
+        // 25% chance of bankruptcy
+        if (Math.random() < 0.25) {
+          setGameState(prev => ({
+            ...prev,
+            gameOver: true,
+            gameOverReason: "Faillite : Votre crédibilité est tombée trop bas suite aux contrôles fiscaux annuels.",
+          }));
+        }
+      }
+    }
+  }, [gameState.day, gameState.month, gameState.gameOver, konamiActive]);
+
+  // Konami code credibility boost effect - more gains, less losses
+  const applyCredibilityChange = useCallback((change: number): number => {
+    if (!konamiActive) return change;
+    
+    // With Konami: gains are doubled, losses are halved
+    if (change > 0) {
+      return Math.min(change * 2, 100 - (gameState.company?.credibility || 50));
+    } else {
+      return Math.ceil(change / 2); // Losses reduced by half
+    }
+  }, [konamiActive, gameState.company?.credibility]);
 
   // Initialize sounds on mount
   useEffect(() => {
@@ -1772,6 +1807,16 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
         achievement={pendingAchievement}
         onClose={() => setPendingAchievement(null)}
       />
+      
+      {/* Konami Code Golden Border */}
+      {konamiActive && (
+        <>
+          <div className="fixed top-0 left-0 right-0 h-[10px] bg-gradient-to-r from-yellow-500 via-yellow-300 to-yellow-500 z-[9999] animate-pulse shadow-lg shadow-yellow-500/50" />
+          <div className="fixed bottom-0 left-0 right-0 h-[10px] bg-gradient-to-r from-yellow-500 via-yellow-300 to-yellow-500 z-[9999] animate-pulse shadow-lg shadow-yellow-500/50" />
+          <div className="fixed top-0 left-0 bottom-0 w-[10px] bg-gradient-to-b from-yellow-500 via-yellow-300 to-yellow-500 z-[9999] animate-pulse shadow-lg shadow-yellow-500/50" />
+          <div className="fixed top-0 right-0 bottom-0 w-[10px] bg-gradient-to-b from-yellow-500 via-yellow-300 to-yellow-500 z-[9999] animate-pulse shadow-lg shadow-yellow-500/50" />
+        </>
+      )}
     </div>
   );
 }

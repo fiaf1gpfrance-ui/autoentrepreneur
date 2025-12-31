@@ -154,14 +154,12 @@ export interface FleetStatistics {
   productivityContribution: number;
 }
 
-// Import du catalogue étendu
-import { EXTENDED_VEHICLE_CATALOG } from '@/data/vehicleCatalog';
+// Note: Le catalogue étendu est dans src/data/vehicleCatalog.ts
+// Pour éviter les dépendances circulaires, on garde un catalogue minimal ici
+// Utilisez EXTENDED_VEHICLE_CATALOG depuis '@/data/vehicleCatalog' pour le catalogue complet
 
-// Catalogue de véhicules disponibles (utilise le catalogue étendu)
-export const VEHICLE_CATALOG: VehicleModel[] = EXTENDED_VEHICLE_CATALOG;
-
-// Ancien catalogue conservé pour compatibilité
-export const LEGACY_VEHICLE_CATALOG: VehicleModel[] = [
+// Catalogue de véhicules de base (pour compatibilité)
+export const VEHICLE_CATALOG: VehicleModel[] = [
   // BERLINES PREMIUM
   {
     id: 'bmw_320d',
