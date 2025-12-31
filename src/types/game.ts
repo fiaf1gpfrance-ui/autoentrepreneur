@@ -509,6 +509,69 @@ export interface Company {
   dailyRewardStreak: number;
   purchasedItems: string[]; // IDs of purchased shop items
   activeBoosts: ActiveBoost[];
+  // Sales Pipeline
+  salesPipeline: SalesPipelineData;
+  customerFeedback: CustomerFeedbackData[];
+}
+
+// Sales Pipeline for state
+export interface SalesPipelineData {
+  leads: LeadData[];
+  deals: DealData[];
+  conversionRates: Record<string, number>;
+  averageDealValue: number;
+  averageSalesCycle: number;
+  winRate: number;
+}
+
+export interface LeadData {
+  id: string;
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  source: 'website' | 'referral' | 'cold_call' | 'trade_show' | 'social_media' | 'advertising' | 'partnership';
+  status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
+  score: number;
+  estimatedValue: number;
+  createdAt: number;
+  lastContactAt: number;
+  notes: string[];
+  assignedTo?: string;
+}
+
+export interface DealData {
+  id: string;
+  leadId: string;
+  name: string;
+  value: number;
+  stage: 'prospecting' | 'qualification' | 'needs_analysis' | 'proposal' | 'negotiation' | 'closing' | 'won' | 'lost';
+  probability: number;
+  expectedCloseDate: number;
+  createdAt: number;
+  products: string[];
+  competitors: string[];
+  notes: string[];
+  activities: DealActivityData[];
+}
+
+export interface DealActivityData {
+  id: string;
+  type: 'call' | 'email' | 'meeting' | 'demo' | 'proposal' | 'negotiation';
+  date: number;
+  description: string;
+  outcome?: 'positive' | 'neutral' | 'negative';
+}
+
+export interface CustomerFeedbackData {
+  id: string;
+  clientId: string;
+  type: 'nps' | 'csat' | 'review' | 'complaint' | 'suggestion';
+  score?: number;
+  comment: string;
+  date: number;
+  resolved: boolean;
+  response?: string;
 }
 
 // Active boost from shop

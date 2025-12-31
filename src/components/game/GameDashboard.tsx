@@ -60,6 +60,7 @@ import { AdvancedInternationalPanel } from "./AdvancedInternationalPanel";
 import { UltraFinancePanel } from "./UltraFinancePanel";
 import { AdvancedProductionPanel } from "./AdvancedProductionPanel";
 import { AdvancedCommercialPanel } from "./AdvancedCommercialPanel";
+import { SalesPipelinePanel } from "./SalesPipelinePanel";
 import { SaveLoadPanel } from "./SaveLoadPanel";
 import { GameSave } from "@/hooks/useGameSave";
 import { GameSettings } from "./CompanySetup";
@@ -113,6 +114,7 @@ import {
   Swords,
   Eye,
   PieChart,
+  Handshake,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -129,7 +131,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'investors' | 'competition' | 'richevents';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'richevents';
 
 export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
@@ -1069,6 +1071,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'hradvanced', label: 'RH Avancé', icon: GraduationCap },
     { id: 'products', label: 'Produits', icon: Package },
     { id: 'advancedcommercial', label: 'Commercial', icon: ShoppingCart },
+    { id: 'salespipeline', label: 'Pipeline', icon: Handshake },
     { id: 'international', label: 'International', icon: Globe },
     { id: 'advancedinternational', label: 'Mondial', icon: Map },
     { id: 'legal', label: 'Juridique', icon: Scale },
@@ -1535,6 +1538,173 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                 onContactClient={(clientId) => toast.success(`Client contacté !`)}
                 onCreateOpportunity={(clientId) => toast.success(`Opportunité créée !`)}
                 onAdvanceOpportunity={(oppId, stage) => toast.success(`Opportunité avancée à ${stage} !`)}
+              />
+            )}
+
+            {activeTab === 'salespipeline' && (
+              <SalesPipelinePanel
+                pipeline={{
+                  leads: company.salesPipeline?.leads || [],
+                  deals: company.salesPipeline?.deals || [],
+                  conversionRates: company.salesPipeline?.conversionRates || {},
+                  averageDealValue: company.salesPipeline?.averageDealValue || 0,
+                  averageSalesCycle: company.salesPipeline?.averageSalesCycle || 30,
+                  winRate: company.salesPipeline?.winRate || 0,
+                }}
+                customerFeedback={company.customerFeedback?.map(f => ({
+                  ...f,
+                  type: f.type as 'nps' | 'csat' | 'review' | 'complaint' | 'suggestion',
+                })) || []}
+                treasury={company.treasury}
+                currentDay={gameState.day}
+                onGenerateLead={(lead) => {
+                  const cost = lead.source === 'referral' ? 0 : 
+                    lead.source === 'website' ? 50 :
+                    lead.source === 'cold_call' ? 100 :
+                    lead.source === 'social_media' ? 200 :
+                    lead.source === 'partnership' ? 500 :
+                    lead.source === 'advertising' ? 1000 : 5000;
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      treasury: prev.company!.treasury - cost,
+                      salesPipeline: {
+                        ...prev.company!.salesPipeline,
+                        leads: [...(prev.company!.salesPipeline?.leads || []), lead],
+                      },
+                    },
+                  }));
+                }}
+                onGenerateLeadBatch={(leads, cost) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      treasury: prev.company!.treasury - cost,
+                      salesPipeline: {
+                        ...prev.company!.salesPipeline,
+                        leads: [...(prev.company!.salesPipeline?.leads || []), ...leads],
+                      },
+                    },
+                  }));
+                }}
+                onQualifyLead={(leadId, qualified, newScore) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      salesPipeline: {
+                        ...prev.company!.salesPipeline,
+                        leads: (prev.company!.salesPipeline?.leads || []).map(l =>
+                          l.id === leadId ? { 
+                            ...l, 
+                            status: qualified ? 'qualified' : 'contacted',
+                            score: newScore 
+                          } : l
+                        ),
+                      },
+                    },
+                  }));
+                }}
+                onConvertToDeaL={(leadId, deal) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      salesPipeline: {
+                        ...prev.company!.salesPipeline,
+                        leads: (prev.company!.salesPipeline?.leads || []).map(l =>
+                          l.id === leadId ? { ...l, status: 'won' } : l
+                        ),
+                        deals: [...(prev.company!.salesPipeline?.deals || []), deal],
+                      },
+                    },
+                  }));
+                }}
+                onAdvanceDeal={(dealId, success) => {
+                  const stages: ('prospecting' | 'qualification' | 'needs_analysis' | 'proposal' | 'negotiation' | 'closing' | 'won')[] = 
+                    ['prospecting', 'qualification', 'needs_analysis', 'proposal', 'negotiation', 'closing', 'won'];
+                  const probabilities: Record<string, number> = {
+                    prospecting: 10, qualification: 20, needs_analysis: 40,
+                    proposal: 60, negotiation: 80, closing: 90, won: 100, lost: 0
+                  };
+                  
+                  setGameState(prev => {
+                    const deals = prev.company!.salesPipeline?.deals || [];
+                    const deal = deals.find(d => d.id === dealId);
+                    if (!deal) return prev;
+                    
+                    let newStage = deal.stage;
+                    let newProbability = deal.probability;
+                    let treasuryChange = 0;
+                    
+                    if (!success) {
+                      newStage = 'lost';
+                      newProbability = 0;
+                    } else {
+                      const currentIndex = stages.indexOf(deal.stage as any);
+                      if (currentIndex < stages.length - 1) {
+                        newStage = stages[currentIndex + 1];
+                        newProbability = probabilities[newStage];
+                        if (newStage === 'won') {
+                          treasuryChange = deal.value;
+                        }
+                      }
+                    }
+                    
+                    return {
+                      ...prev,
+                      company: {
+                        ...prev.company!,
+                        treasury: prev.company!.treasury + treasuryChange,
+                        monthlyRevenue: newStage === 'won' 
+                          ? prev.company!.monthlyRevenue + deal.value / 12 
+                          : prev.company!.monthlyRevenue,
+                        salesPipeline: {
+                          ...prev.company!.salesPipeline,
+                          deals: deals.map(d =>
+                            d.id === dealId ? { ...d, stage: newStage, probability: newProbability } : d
+                          ),
+                          winRate: success && newStage === 'won'
+                            ? Math.round(((prev.company!.salesPipeline?.winRate || 0) * deals.length + 100) / (deals.length + 1))
+                            : prev.company!.salesPipeline?.winRate || 0,
+                        },
+                      },
+                    };
+                  });
+                }}
+                onAddActivity={(dealId, activityType, description) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      salesPipeline: {
+                        ...prev.company!.salesPipeline,
+                        deals: (prev.company!.salesPipeline?.deals || []).map(d =>
+                          d.id === dealId ? {
+                            ...d,
+                            activities: [...d.activities, {
+                              id: `activity_${Date.now()}`,
+                              type: activityType as 'call' | 'email' | 'meeting' | 'demo' | 'proposal' | 'negotiation',
+                              date: gameState.day,
+                              description,
+                            }],
+                          } : d
+                        ),
+                      },
+                    },
+                  }));
+                }}
+                onRecordFeedback={(feedback) => {
+                  setGameState(prev => ({
+                    ...prev,
+                    company: {
+                      ...prev.company!,
+                      customerFeedback: [...(prev.company!.customerFeedback || []), feedback],
+                    },
+                  }));
+                }}
               />
             )}
           </div>
