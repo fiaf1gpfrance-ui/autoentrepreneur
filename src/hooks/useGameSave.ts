@@ -3,6 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Company } from '@/types/game';
 import { GameSettings } from '@/components/game/CompanySetup';
 import { toast } from 'sonner';
+import { 
+  validateCompanyData, 
+  validateGameState, 
+  validateGameSettings 
+} from '@/utils/gameSaveValidation';
 
 const LOCAL_STORAGE_KEY = 'simu_entrepreneur_save';
 const AUTO_SAVE_INTERVAL = 60000; // 1 minute
@@ -103,10 +108,32 @@ export function useGameSave() {
     }
   }, []);
 
-  // Save to Cloud
+  // Save to Cloud with validation
   const saveToCloud = useCallback(async (save: GameSave): Promise<boolean> => {
     if (!userId) {
       console.log('No user logged in, skipping cloud save');
+      return false;
+    }
+
+    // Validate all data before saving to cloud
+    const companyValidation = validateCompanyData(save.company_data);
+    if (!companyValidation.success) {
+      console.error('Company data validation failed:', companyValidation.error);
+      toast.error('Erreur de validation des données entreprise');
+      return false;
+    }
+
+    const gameStateValidation = validateGameState(save.game_state);
+    if (!gameStateValidation.success) {
+      console.error('Game state validation failed:', gameStateValidation.error);
+      toast.error('Erreur de validation de l\'état du jeu');
+      return false;
+    }
+
+    const settingsValidation = validateGameSettings(save.game_settings);
+    if (!settingsValidation.success) {
+      console.error('Game settings validation failed:', settingsValidation.error);
+      toast.error('Erreur de validation des paramètres');
       return false;
     }
 
@@ -115,11 +142,11 @@ export function useGameSave() {
         .from('game_saves')
         .upsert({
           user_id: userId,
-          save_name: save.save_name,
-          company_data: save.company_data as any,
-          game_state: save.game_state as any,
-          game_settings: save.game_settings as any,
-          play_time: save.play_time,
+          save_name: save.save_name.slice(0, 100), // Enforce max length
+          company_data: companyValidation.data,
+          game_state: gameStateValidation.data,
+          game_settings: settingsValidation.data,
+          play_time: Math.max(0, save.play_time),
           is_auto_save: save.is_auto_save,
           updated_at: new Date().toISOString()
         }, {
@@ -131,10 +158,10 @@ export function useGameSave() {
         const { error: updateError } = await supabase
           .from('game_saves')
           .update({
-            company_data: save.company_data as any,
-            game_state: save.game_state as any,
-            game_settings: save.game_settings as any,
-            play_time: save.play_time,
+            company_data: companyValidation.data,
+            game_state: gameStateValidation.data,
+            game_settings: settingsValidation.data,
+            play_time: Math.max(0, save.play_time),
             is_auto_save: save.is_auto_save,
             updated_at: new Date().toISOString()
           })
