@@ -68,6 +68,11 @@ import { DesktopIcon } from "./DesktopIcon";
 import { DesktopOverview } from "./DesktopOverview";
 import { StartMenu } from "./StartMenu";
 import { NotificationCenter, GameNotification } from "./NotificationCenter";
+import { DesktopWidget } from "./DesktopWidget";
+import { ClockWidget } from "./ClockWidget";
+import { EconomicWeatherWidget } from "./EconomicWeatherWidget";
+import { FinanceChartWidget } from "./FinanceChartWidget";
+import { QuickStatsWidget } from "./QuickStatsWidget";
 import { GameSave } from "@/hooks/useGameSave";
 import { GameSettings } from "./CompanySetup";
 import { InvestorsPanel } from "./InvestorsPanel";
@@ -139,15 +144,36 @@ const weatherConfig = {
 
 type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'richevents';
 
+interface OpenWindow {
+  id: TabId;
+  isMinimized: boolean;
+  zIndex: number;
+}
+
+interface WidgetState {
+  id: string;
+  isVisible: boolean;
+  isMinimized: boolean;
+  position: { x: number; y: number };
+}
+
 export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [openWindows, setOpenWindows] = useState<OpenWindow[]>([{ id: 'overview', isMinimized: false, zIndex: 1 }]);
+  const [activeWindowId, setActiveWindowId] = useState<TabId>('overview');
   const [showSavePanel, setShowSavePanel] = useState(false);
   const [showStartMenu, setShowStartMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [recentApps, setRecentApps] = useState<string[]>([]);
   const [pinnedApps, setPinnedApps] = useState<string[]>(['overview', 'shop', 'progression', 'achievements', 'banking', 'rh']);
   const [notifications, setNotifications] = useState<GameNotification[]>([]);
+  const [treasuryHistory, setTreasuryHistory] = useState<number[]>([]);
+  const [widgets, setWidgets] = useState<WidgetState[]>([
+    { id: 'clock', isVisible: true, isMinimized: false, position: { x: 100, y: 80 } },
+    { id: 'weather', isVisible: true, isMinimized: false, position: { x: 100, y: 320 } },
+    { id: 'finance', isVisible: true, isMinimized: false, position: { x: 400, y: 80 } },
+    { id: 'stats', isVisible: true, isMinimized: false, position: { x: 400, y: 340 } },
+  ]);
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     difficulty: 'normal',
     gameMode: 'career',
@@ -157,6 +183,54 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     objective: 'millionaire',
     legalStructure: 'sas'
   });
+  
+  // Track max z-index for window focus
+  const [maxZIndex, setMaxZIndex] = useState(1);
+
+  // Multi-window management functions
+  const openApp = useCallback((appId: TabId) => {
+    setOpenWindows(prev => {
+      const existing = prev.find(w => w.id === appId);
+      if (existing) {
+        // Bring to front and restore if minimized
+        return prev.map(w => w.id === appId 
+          ? { ...w, isMinimized: false, zIndex: maxZIndex + 1 }
+          : w
+        );
+      }
+      // Open new window
+      return [...prev, { id: appId, isMinimized: false, zIndex: maxZIndex + 1 }];
+    });
+    setMaxZIndex(prev => prev + 1);
+    setActiveWindowId(appId);
+    setRecentApps(prev => [appId, ...prev.filter(a => a !== appId)].slice(0, 10));
+  }, [maxZIndex]);
+
+  const closeWindow = useCallback((windowId: TabId) => {
+    setOpenWindows(prev => prev.filter(w => w.id !== windowId));
+    // Set active to next window or null
+    setOpenWindows(prev => {
+      if (prev.length > 0) {
+        const nextActive = prev.reduce((a, b) => a.zIndex > b.zIndex ? a : b);
+        setActiveWindowId(nextActive.id);
+      }
+      return prev;
+    });
+  }, []);
+
+  const minimizeWindow = useCallback((windowId: TabId) => {
+    setOpenWindows(prev => prev.map(w => 
+      w.id === windowId ? { ...w, isMinimized: true } : w
+    ));
+  }, []);
+
+  const focusWindow = useCallback((windowId: TabId) => {
+    setOpenWindows(prev => prev.map(w => 
+      w.id === windowId ? { ...w, zIndex: maxZIndex + 1, isMinimized: false } : w
+    ));
+    setMaxZIndex(prev => prev + 1);
+    setActiveWindowId(windowId);
+  }, [maxZIndex]);
 
   const company = gameState.company!;
   const weather = weatherConfig[gameState.economicWeather];
@@ -1122,14 +1196,14 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     return colors[id] || "text-primary";
   };
 
-  // Open apps for taskbar (currently active app)
-  const openApps = activeTab ? [tabs.find(t => t.id === activeTab)!].filter(Boolean).map(t => ({
-    ...t,
-    color: getIconColor(t.id)
-  })) : [];
+  // Open apps for taskbar
+  const taskbarApps = openWindows.map(w => {
+    const tab = tabs.find(t => t.id === w.id);
+    return tab ? { ...tab, color: getIconColor(tab.id), isMinimized: w.isMinimized } : null;
+  }).filter(Boolean);
 
-  const renderAppContent = () => {
-    switch (activeTab) {
+  const renderAppContent = (tabId: TabId) => {
+    switch (tabId) {
       case 'overview':
         return <DesktopOverview company={company} gameState={gameState} onDismissEvent={dismissEvent} />;
 
@@ -1281,7 +1355,23 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     }
   };
 
-  const activeTabData = tabs.find(t => t.id === activeTab);
+  // Widget management
+  const updateWidgetPosition = useCallback((widgetId: string, position: { x: number; y: number }) => {
+    setWidgets(prev => prev.map(w => w.id === widgetId ? { ...w, position } : w));
+  }, []);
+
+  const toggleWidgetMinimize = useCallback((widgetId: string) => {
+    setWidgets(prev => prev.map(w => w.id === widgetId ? { ...w, isMinimized: !w.isMinimized } : w));
+  }, []);
+
+  const closeWidget = useCallback((widgetId: string) => {
+    setWidgets(prev => prev.map(w => w.id === widgetId ? { ...w, isVisible: false } : w));
+  }, []);
+
+  // Track treasury history for chart
+  useEffect(() => {
+    setTreasuryHistory(prev => [...prev.slice(-29), company.treasury]);
+  }, [company.treasury]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
@@ -1307,27 +1397,113 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
               id={tab.id}
               label={tab.label}
               icon={tab.icon}
-              isActive={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id as TabId)}
+              isActive={openWindows.some(w => w.id === tab.id && !w.isMinimized)}
+              onClick={() => openApp(tab.id as TabId)}
               color={getIconColor(tab.id)}
             />
           ))}
         </div>
 
-        {/* Main App Window Area */}
-        <div className="flex-1 p-3 overflow-hidden">
-          {activeTabData && (
-            <AppWindow
-              key={activeTabData.id}
-              id={activeTabData.id}
-              title={activeTabData.label}
-              icon={activeTabData.icon}
-              onClose={() => setActiveTab('overview')}
-              color={getIconColor(activeTabData.id)}
-            >
-              {renderAppContent()}
-            </AppWindow>
+        {/* Main Window Area - Multi-window support */}
+        <div className="flex-1 p-3 overflow-hidden relative">
+          {/* Desktop Widgets */}
+          {openWindows.length === 0 && (
+            <>
+              {widgets.filter(w => w.isVisible).map(widget => {
+                const widgetContent = {
+                  clock: (
+                    <ClockWidget
+                      gameDay={gameState.day}
+                      gameMonth={gameState.month}
+                      gameYear={gameState.year}
+                      isPaused={gameState.isPaused}
+                    />
+                  ),
+                  weather: (
+                    <EconomicWeatherWidget
+                      weather={gameState.economicWeather}
+                      marketTrend={Math.floor(Math.random() * 40) - 20}
+                      interestRate={gameState.interestRate || 3.5}
+                      inflation={2.1}
+                    />
+                  ),
+                  finance: (
+                    <FinanceChartWidget
+                      treasury={company.treasury}
+                      revenue={company.monthlyRevenue}
+                      history={treasuryHistory}
+                    />
+                  ),
+                  stats: (
+                    <QuickStatsWidget
+                      employees={company.employees.length}
+                      products={company.products.length}
+                      credibility={company.credibility}
+                      moral={70}
+                      properties={company.properties.length}
+                      marketShare={company.marketShare}
+                    />
+                  ),
+                };
+
+                const widgetSizes: Record<string, { width: number; height: number }> = {
+                  clock: { width: 260, height: 200 },
+                  weather: { width: 280, height: 240 },
+                  finance: { width: 300, height: 240 },
+                  stats: { width: 280, height: 200 },
+                };
+
+                const widgetTitles: Record<string, string> = {
+                  clock: 'Horloge',
+                  weather: 'Météo économique',
+                  finance: 'Finances',
+                  stats: 'Statistiques',
+                };
+
+                return (
+                  <DesktopWidget
+                    key={widget.id}
+                    id={widget.id}
+                    title={widgetTitles[widget.id] || widget.id}
+                    initialPosition={widget.position}
+                    initialSize={widgetSizes[widget.id]}
+                    onClose={() => closeWidget(widget.id)}
+                    onPositionChange={(pos) => updateWidgetPosition(widget.id, pos)}
+                    isMinimized={widget.isMinimized}
+                    onToggleMinimize={() => toggleWidgetMinimize(widget.id)}
+                  >
+                    {widgetContent[widget.id as keyof typeof widgetContent]}
+                  </DesktopWidget>
+                );
+              })}
+            </>
           )}
+
+          {/* Render open windows */}
+          {openWindows.filter(w => !w.isMinimized).map(window => {
+            const tabData = tabs.find(t => t.id === window.id);
+            if (!tabData) return null;
+            
+            return (
+              <div
+                key={window.id}
+                className="absolute inset-0 p-3"
+                style={{ zIndex: window.zIndex }}
+                onClick={() => focusWindow(window.id)}
+              >
+                <AppWindow
+                  id={tabData.id}
+                  title={tabData.label}
+                  icon={tabData.icon}
+                  onClose={() => closeWindow(window.id)}
+                  onMinimize={() => minimizeWindow(window.id)}
+                  color={getIconColor(tabData.id)}
+                >
+                  {renderAppContent(window.id)}
+                </AppWindow>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -1344,10 +1520,10 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
         gameSpeed={gameState.gameSpeed}
         economicWeather={gameState.economicWeather}
         canClaimReward={canClaimDailyReward(company, gameState.day)}
-        openApps={openApps}
-        activeAppId={activeTab}
+        openApps={taskbarApps as any}
+        activeAppId={activeWindowId}
         notificationCount={notifications.filter(n => !n.read).length}
-        onAppClick={(id) => setActiveTab(id as TabId)}
+        onAppClick={(id) => openApp(id as TabId)}
         onTogglePause={togglePause}
         onSetSpeed={setSpeed}
         onSave={handleSave}
@@ -1362,8 +1538,8 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
         isOpen={showStartMenu}
         onClose={() => setShowStartMenu(false)}
         onAppClick={(id) => {
-          setActiveTab(id as TabId);
-          setRecentApps(prev => [id, ...prev.filter(a => a !== id)].slice(0, 10));
+          openApp(id as TabId);
+          setShowStartMenu(false);
         }}
         companyName={company.name}
         treasury={company.treasury}
