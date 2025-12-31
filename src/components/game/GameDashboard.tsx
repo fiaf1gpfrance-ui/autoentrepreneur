@@ -66,6 +66,8 @@ import { Taskbar } from "./Taskbar";
 import { AppWindow } from "./AppWindow";
 import { DesktopIcon } from "./DesktopIcon";
 import { DesktopOverview } from "./DesktopOverview";
+import { StartMenu } from "./StartMenu";
+import { NotificationCenter, GameNotification } from "./NotificationCenter";
 import { GameSave } from "@/hooks/useGameSave";
 import { GameSettings } from "./CompanySetup";
 import { InvestorsPanel } from "./InvestorsPanel";
@@ -141,6 +143,11 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const [gameState, setGameState] = useState<GameState>(initialState);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [showSavePanel, setShowSavePanel] = useState(false);
+  const [showStartMenu, setShowStartMenu] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [recentApps, setRecentApps] = useState<string[]>([]);
+  const [pinnedApps, setPinnedApps] = useState<string[]>(['overview', 'shop', 'progression', 'achievements', 'banking', 'rh']);
+  const [notifications, setNotifications] = useState<GameNotification[]>([]);
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     difficulty: 'normal',
     gameMode: 'career',
@@ -1339,15 +1346,45 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
         canClaimReward={canClaimDailyReward(company, gameState.day)}
         openApps={openApps}
         activeAppId={activeTab}
+        notificationCount={notifications.filter(n => !n.read).length}
         onAppClick={(id) => setActiveTab(id as TabId)}
         onTogglePause={togglePause}
         onSetSpeed={setSpeed}
         onSave={handleSave}
         onReset={onReset}
         onClaimReward={claimDailyRewardAction}
+        onStartMenuClick={() => setShowStartMenu(!showStartMenu)}
+        onNotificationsClick={() => setShowNotifications(!showNotifications)}
       />
 
-      {/* Save/Load Panel Modal */}
+      {/* Start Menu */}
+      <StartMenu
+        isOpen={showStartMenu}
+        onClose={() => setShowStartMenu(false)}
+        onAppClick={(id) => {
+          setActiveTab(id as TabId);
+          setRecentApps(prev => [id, ...prev.filter(a => a !== id)].slice(0, 10));
+        }}
+        companyName={company.name}
+        treasury={company.treasury}
+        day={gameState.day}
+        recentApps={recentApps}
+        pinnedApps={pinnedApps}
+        onPinApp={(id) => setPinnedApps(prev => [...prev, id])}
+        onUnpinApp={(id) => setPinnedApps(prev => prev.filter(a => a !== id))}
+        onReset={onReset}
+        onSave={handleSave}
+      />
+
+      {/* Notification Center */}
+      <NotificationCenter
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={notifications}
+        onMarkAsRead={(id) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))}
+        onDismiss={(id) => setNotifications(prev => prev.filter(n => n.id !== id))}
+        onClearAll={() => setNotifications([])}
+      />
       {showSavePanel && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
