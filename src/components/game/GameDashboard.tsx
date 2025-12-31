@@ -1117,31 +1117,6 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     ? company.employees.reduce((sum, e) => sum + e.moral, 0) / company.employees.length
     : 0;
 
-  if (gameState.gameOver) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="game-panel max-w-md w-full text-center space-y-6 animate-fade-in">
-          <div className="text-6xl">💀</div>
-          <h1 className="text-3xl font-display font-bold text-destructive">Game Over</h1>
-          <p className="text-muted-foreground">{gameState.gameOverReason}</p>
-          <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Durée</span>
-              <span className="font-medium">{gameState.year - 1} an(s), {gameState.month} mois</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Trésorerie finale</span>
-              <span className={cn("font-medium", company.treasury >= 0 ? "text-success" : "text-destructive")}>
-                {formatCurrency(company.treasury)}
-              </span>
-            </div>
-          </div>
-          <button onClick={onReset} className="w-full btn-game-primary">Nouvelle Partie</button>
-        </div>
-      </div>
-    );
-  }
-
   const canExport = LEGAL_STATUS_MODIFIERS[company.legalStatus].canExport;
 
   const tabs = [
@@ -1380,6 +1355,32 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   useEffect(() => {
     setTreasuryHistory(prev => [...prev.slice(-29), company.treasury]);
   }, [company.treasury]);
+
+  // Game Over screen - must be after all hooks
+  if (gameState.gameOver) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="game-panel max-w-md w-full text-center space-y-6 animate-fade-in">
+          <div className="text-6xl">💀</div>
+          <h1 className="text-3xl font-display font-bold text-destructive">Game Over</h1>
+          <p className="text-muted-foreground">{gameState.gameOverReason}</p>
+          <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Durée</span>
+              <span className="font-medium">{gameState.year - 1} an(s), {gameState.month} mois</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Trésorerie finale</span>
+              <span className={cn("font-medium", company.treasury >= 0 ? "text-success" : "text-destructive")}>
+                {formatCurrency(company.treasury)}
+              </span>
+            </div>
+          </div>
+          <button onClick={onReset} className="w-full btn-game-primary">Nouvelle Partie</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
