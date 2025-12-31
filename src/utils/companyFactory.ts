@@ -63,6 +63,25 @@ export function createCompany(
     dailyRewardStreak: 0,
     purchasedItems: [],
     activeBoosts: [],
+    // Sales Pipeline
+    salesPipeline: {
+      leads: [],
+      deals: [],
+      conversionRates: {
+        prospecting: 0,
+        qualification: 0,
+        needs_analysis: 0,
+        proposal: 0,
+        negotiation: 0,
+        closing: 0,
+        won: 0,
+        lost: 0,
+      },
+      averageDealValue: 0,
+      averageSalesCycle: 30,
+      winRate: 0,
+    },
+    customerFeedback: [],
   };
 }
 
