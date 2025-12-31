@@ -348,15 +348,16 @@ export function processDayTick(state: GameState): GameState {
   
   company.products = company.products.map(product => {
     if (product.phase === 'rd') {
-      // R&D progress
+      // R&D progress - completes in ~30 days with base speed
       const rdSpeed = company.employees.reduce((sum, e) => {
         if (e.role === 'Développeur' || e.role === 'Technicien') {
           return sum + (e.skills / 100) * (e.productivity / 100);
         }
         return sum;
-      }, 0.1);
+      }, 0.5);
       
-      product.rdProgress = Math.min(100, product.rdProgress + rdSpeed * 2);
+      // Base progression: ~3.3% per day = 100% in 30 days
+      product.rdProgress = Math.min(100, product.rdProgress + 3.3 + rdSpeed * 0.5);
       
       if (product.rdProgress >= 100) {
         product.phase = 'lancement';
