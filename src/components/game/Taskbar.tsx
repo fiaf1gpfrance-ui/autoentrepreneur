@@ -1,7 +1,8 @@
 import { cn } from "@/lib/utils";
-import { LucideIcon, Calendar, Coins, Gem, Gift, Play, Pause, FastForward, Save, RotateCcw, Cloud, Sun, CloudRain, CloudLightning, Search, Grid3X3 } from "lucide-react";
+import { LucideIcon, Calendar, Coins, Gem, Gift, Play, Pause, FastForward, Save, RotateCcw, Cloud, Sun, CloudRain, CloudLightning, Search, Grid3X3, BellRing } from "lucide-react";
 import { formatCurrency } from "@/utils/gameEngine";
 import { useState } from "react";
+import { SystemTray } from "./SystemTray";
 
 interface TaskbarApp {
   id: string;
@@ -24,12 +25,15 @@ interface TaskbarProps {
   canClaimReward: boolean;
   openApps: TaskbarApp[];
   activeAppId: string | null;
+  notificationCount: number;
   onAppClick: (id: string) => void;
   onTogglePause: () => void;
   onSetSpeed: (speed: number) => void;
   onSave: () => void;
   onReset: () => void;
   onClaimReward: () => void;
+  onStartMenuClick: () => void;
+  onNotificationsClick: () => void;
 }
 
 const weatherConfig = {
@@ -53,12 +57,15 @@ export function Taskbar({
   canClaimReward,
   openApps,
   activeAppId,
+  notificationCount,
   onAppClick,
   onTogglePause,
   onSetSpeed,
   onSave,
   onReset,
   onClaimReward,
+  onStartMenuClick,
+  onNotificationsClick,
 }: TaskbarProps) {
   const weather = weatherConfig[economicWeather];
   const WeatherIcon = weather.icon;
@@ -67,10 +74,14 @@ export function Taskbar({
   return (
     <div className="h-12 glass-effect border-t border-white/10 flex items-center px-2 gap-1">
       {/* Start Button */}
-      <button className="h-10 px-3 flex items-center gap-2 rounded-md hover:bg-white/10 transition-all duration-200 group">
-        <div className="w-6 h-6 rounded bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-shadow">
+      <button 
+        onClick={onStartMenuClick}
+        className="h-10 px-3 flex items-center gap-2 rounded-md hover:bg-white/10 transition-all duration-200 group"
+      >
+        <div className="w-6 h-6 rounded bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg shadow-primary/30 group-hover:shadow-primary/50 transition-shadow group-hover:scale-110 transition-transform">
           <Grid3X3 className="w-4 h-4 text-primary-foreground" />
         </div>
+        <span className="text-xs font-medium hidden lg:inline">Démarrer</span>
       </button>
 
       {/* Search (decorative) */}
@@ -185,13 +196,22 @@ export function Taskbar({
 
         {/* Save/Reset */}
         <div className="flex items-center gap-0.5">
-          <button onClick={onSave} className="h-7 w-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors">
+          <button onClick={onSave} className="h-7 w-7 flex items-center justify-center rounded hover:bg-white/10 transition-colors" title="Sauvegarder">
             <Save className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onReset} className="h-7 w-7 flex items-center justify-center rounded hover:bg-destructive/20 transition-colors text-destructive">
+          <button onClick={onReset} className="h-7 w-7 flex items-center justify-center rounded hover:bg-destructive/20 transition-colors text-destructive" title="Quitter">
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-white/10 mx-1" />
+
+        {/* System Tray */}
+        <SystemTray 
+          notifications={notificationCount}
+          onOpenNotifications={onNotificationsClick}
+        />
 
         {/* Divider */}
         <div className="w-px h-6 bg-white/10 mx-1" />
