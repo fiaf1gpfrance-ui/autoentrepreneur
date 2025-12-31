@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { toast } from 'sonner';
+import confetti from 'canvas-confetti';
 
 interface KonamiContextType {
   konamiActive: boolean;
@@ -10,6 +11,46 @@ const KonamiContext = createContext<KonamiContextType | null>(null);
 
 const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
 
+// Fonction pour lancer les confettis dorés
+const launchGoldenConfetti = () => {
+  const duration = 4000;
+  const end = Date.now() + duration;
+
+  const colors = ['#FFD700', '#FFA500', '#FFEC8B', '#DAA520', '#F4C430'];
+
+  const frame = () => {
+    confetti({
+      particleCount: 3,
+      angle: 60,
+      spread: 55,
+      origin: { x: 0, y: 0.7 },
+      colors: colors,
+    });
+    confetti({
+      particleCount: 3,
+      angle: 120,
+      spread: 55,
+      origin: { x: 1, y: 0.7 },
+      colors: colors,
+    });
+
+    if (Date.now() < end) {
+      requestAnimationFrame(frame);
+    }
+  };
+
+  // Explosion initiale au centre
+  confetti({
+    particleCount: 150,
+    spread: 100,
+    origin: { y: 0.6 },
+    colors: colors,
+    scalar: 1.2,
+  });
+
+  frame();
+};
+
 export function KonamiProvider({ children }: { children: ReactNode }) {
   const [konamiActive, setKonamiActive] = useState(false);
   const konamiSequenceRef = useRef<string[]>([]);
@@ -18,6 +59,7 @@ export function KonamiProvider({ children }: { children: ReactNode }) {
     if (!konamiActive) {
       setKonamiActive(true);
       toast.success('🎮 KONAMI CODE ACTIVÉ ! Mode protégé : crédibilité boostée, faillite impossible !', { duration: 5000 });
+      launchGoldenConfetti();
     }
   };
 
