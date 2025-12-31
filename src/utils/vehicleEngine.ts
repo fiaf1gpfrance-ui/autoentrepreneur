@@ -9,9 +9,9 @@ import {
   VehicleCategory,
   VehicleStatus,
   FuelType,
-  VEHICLE_CATALOG,
   calculateMonthlyVehicleCost,
 } from '@/types/vehicles';
+import { EXTENDED_VEHICLE_CATALOG } from '@/data/vehicleCatalog';
 
 // ==================== CRÉATION DE VÉHICULES ====================
 
@@ -21,7 +21,7 @@ export function purchaseVehicle(
   color: string,
   currentDay: number
 ): CompanyVehicle | null {
-  const model = VEHICLE_CATALOG.find(v => v.id === modelId);
+  const model = EXTENDED_VEHICLE_CATALOG.find(v => v.id === modelId);
   if (!model) return null;
   
   const licensePlate = generateLicensePlate();
