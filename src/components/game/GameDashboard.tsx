@@ -73,6 +73,10 @@ import { ClockWidget } from "./ClockWidget";
 import { EconomicWeatherWidget } from "./EconomicWeatherWidget";
 import { FinanceChartWidget } from "./FinanceChartWidget";
 import { QuickStatsWidget } from "./QuickStatsWidget";
+import { EventCalendarWidget } from "./EventCalendarWidget";
+import { TaskListWidget } from "./TaskListWidget";
+import { TaxAlertWidget } from "./TaxAlertWidget";
+import { EmployeeChartWidget } from "./EmployeeChartWidget";
 import { GameSave } from "@/hooks/useGameSave";
 import { GameSettings } from "./CompanySetup";
 import { InvestorsPanel } from "./InvestorsPanel";
@@ -173,6 +177,10 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'weather', isVisible: true, isMinimized: false, position: { x: 100, y: 320 } },
     { id: 'finance', isVisible: true, isMinimized: false, position: { x: 400, y: 80 } },
     { id: 'stats', isVisible: true, isMinimized: false, position: { x: 400, y: 340 } },
+    { id: 'calendar', isVisible: true, isMinimized: false, position: { x: 700, y: 80 } },
+    { id: 'tasks', isVisible: true, isMinimized: false, position: { x: 700, y: 380 } },
+    { id: 'taxes', isVisible: true, isMinimized: false, position: { x: 1000, y: 80 } },
+    { id: 'employees', isVisible: true, isMinimized: false, position: { x: 1000, y: 340 } },
   ]);
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     difficulty: 'normal',
@@ -1444,6 +1452,45 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                       marketShare={company.marketShare}
                     />
                   ),
+                  calendar: (
+                    <EventCalendarWidget
+                      currentDay={gameState.day}
+                      currentMonth={gameState.month}
+                      events={company.taxDeclarations.map((tax, i) => ({
+                        id: `tax_${i}`,
+                        title: tax.type,
+                        day: gameState.day + (i + 1) * 5,
+                        type: 'tax' as const,
+                        completed: tax.paid
+                      }))}
+                    />
+                  ),
+                  tasks: (
+                    <TaskListWidget />
+                  ),
+                  taxes: (
+                    <TaxAlertWidget
+                      currentDay={gameState.day}
+                      taxAlerts={[]}
+                      treasury={company.treasury}
+                    />
+                  ),
+                  employees: (
+                    <EmployeeChartWidget
+                      stats={{
+                        total: company.employees.length,
+                        byDepartment: [
+                          { name: 'Tech', count: Math.max(1, Math.floor(company.employees.length * 0.4)), color: 'bg-blue-500' },
+                          { name: 'Ventes', count: Math.max(1, Math.floor(company.employees.length * 0.25)), color: 'bg-green-500' },
+                          { name: 'Admin', count: Math.max(1, Math.floor(company.employees.length * 0.2)), color: 'bg-purple-500' },
+                          { name: 'Marketing', count: Math.max(1, Math.floor(company.employees.length * 0.15)), color: 'bg-orange-500' },
+                        ],
+                        averageMorale: Math.round(company.employees.reduce((sum, e) => sum + (e.moral || 70), 0) / Math.max(1, company.employees.length)),
+                        averageSalary: Math.round(company.employees.reduce((sum, e) => sum + e.brutSalary, 0) / Math.max(1, company.employees.length)),
+                        recentChanges: { type: 'hired', count: 1 }
+                      }}
+                    />
+                  ),
                 };
 
                 const widgetSizes: Record<string, { width: number; height: number }> = {
@@ -1451,6 +1498,10 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                   weather: { width: 280, height: 240 },
                   finance: { width: 300, height: 240 },
                   stats: { width: 280, height: 200 },
+                  calendar: { width: 280, height: 280 },
+                  tasks: { width: 260, height: 220 },
+                  taxes: { width: 280, height: 260 },
+                  employees: { width: 280, height: 240 },
                 };
 
                 const widgetTitles: Record<string, string> = {
@@ -1458,6 +1509,10 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                   weather: 'Météo économique',
                   finance: 'Finances',
                   stats: 'Statistiques',
+                  calendar: 'Calendrier',
+                  tasks: 'Tâches',
+                  taxes: 'Alertes fiscales',
+                  employees: 'Employés',
                 };
 
                 return (
