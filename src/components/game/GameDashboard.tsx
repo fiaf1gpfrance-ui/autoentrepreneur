@@ -1184,7 +1184,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
       case 'shop':
         return <ShopPanel coins={company.coins || 0} gems={company.gems || 0} purchasedItems={[]} onPurchase={(itemId, cost, currency) => { toast.success('Achat effectué !'); }} />;
       case 'progression':
-        return <ProgressionPanel day={gameState.day} stats={{ totalRevenue: company.monthlyRevenue * 12, totalEmployeesHired: company.employees.length, totalProductsLaunched: company.products.length }} />;
+        return <ProgressionPanel day={gameState.day} stats={{ totalRevenue: company.monthlyRevenue * 12, employeesHired: company.employees.length, productsLaunched: company.products.length }} />;
       case 'achievements':
         return <AchievementsPanel achievements={company.achievements} missions={company.missions} />;
       case 'investors':
@@ -1217,7 +1217,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
       case 'realestate':
         return <RealEstatePanel properties={company.properties} treasury={company.treasury} employeeCount={company.employees.length} onBuyProperty={handleBuyProperty} onRentProperty={handleRentProperty} onSellProperty={handleSellProperty} onMaintenance={handleMaintenance} />;
       case 'supply':
-        return <SupplyChainPanel suppliers={company.suppliers} inventory={company.inventory} clients={company.clients} invoices={company.invoices} treasury={company.treasury} onAddSupplier={handleAddSupplier} />;
+        return <SupplyChainPanel suppliers={company.suppliers} inventory={company.inventory} clients={company.clients} invoices={company.invoices} treasury={company.treasury} onAddSupplier={handleAddSupplier} onOrderInventory={(supplierId, item, qty) => toast.success('Commande passée !')} onAddClient={(client) => toast.success('Client ajouté !')} onCreateContract={(clientId, contract) => toast.success('Contrat créé !')} onPayInvoice={(invoiceId) => toast.success('Facture payée !')} />;
       case 'hradvanced':
         return <HRAdvancedPanel employees={company.employees} socialBenefits={company.socialBenefits} unions={company.unions} treasury={company.treasury} onStartTraining={handleStartTraining} onToggleBenefit={handleToggleBenefit} onNegotiateUnion={handleNegotiateUnion} onPromoteEmployee={handlePromoteEmployee} onGiveRaise={handleGiveRaise} />;
       case 'legal':
@@ -1225,9 +1225,9 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
       case 'gameplay':
         return <GameplayPanel financialHistory={company.financialHistory || []} achievements={company.achievements} competitors={company.competitors || []} marketShare={company.marketShare} />;
       case 'international':
-        return <InternationalPanel foreignMarkets={company.foreignMarkets} subsidiaries={company.subsidiaries} canExport={canExport} treasury={company.treasury} onEnterMarket={handleEnterMarket} onCreateSubsidiary={handleCreateSubsidiary} onInvestInMarket={handleInvestInMarket} onInvestInSubsidiary={handleInvestInSubsidiary} onEnableProductExport={handleEnableProductExport} />;
+        return <InternationalPanel foreignMarkets={company.foreignMarkets} subsidiaries={company.subsidiaries} canExport={canExport} treasury={company.treasury} exchangeRates={{ EUR: 1, USD: 1.08, GBP: 0.86, CHF: 0.95, JPY: 160, CNY: 7.8 }} companyReputation={company.reputation} onEnterMarket={handleEnterMarket} onCreateSubsidiary={handleCreateSubsidiary} onInvestInMarket={handleInvestInMarket} onInvestInSubsidiary={handleInvestInSubsidiary} onEnableProductExport={handleEnableProductExport} />;
       case 'advancedinternational':
-        return <AdvancedInternationalPanel company={company} currentDay={gameState.day} onInvest={(amount, country, mode) => {
+        return <AdvancedInternationalPanel treasury={company.treasury} onInvest={(amount, country, mode) => {
           if (company.treasury >= amount) {
             setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury - amount } }));
             toast.success(`Investissement de ${amount}€ en ${country} via ${mode} !`);
