@@ -1277,11 +1277,23 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   const activeTabData = tabs.find(t => t.id === activeTab);
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-background via-background to-secondary/20 overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden relative">
+      {/* Windows-style Wallpaper Background */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950"
+        style={{
+          backgroundImage: `
+            radial-gradient(ellipse at 20% 80%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 50%, rgba(14, 165, 233, 0.05) 0%, transparent 70%)
+          `
+        }}
+      />
+      
       {/* Desktop Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* App Icons Sidebar */}
-        <div className="w-24 bg-card/30 backdrop-blur-sm border-r border-border/30 py-4 overflow-y-auto flex flex-col gap-1 items-center">
+      <div className="flex-1 flex overflow-hidden relative z-10">
+        {/* App Icons Sidebar - Windows-style dock */}
+        <div className="w-20 glass-effect border-r border-white/10 py-3 overflow-y-auto flex flex-col gap-0.5 items-center scrollbar-thin scrollbar-thumb-white/10">
           {tabs.map(tab => (
             <DesktopIcon
               key={tab.id}
@@ -1296,9 +1308,10 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
         </div>
 
         {/* Main App Window Area */}
-        <div className="flex-1 p-4 overflow-hidden">
+        <div className="flex-1 p-3 overflow-hidden">
           {activeTabData && (
             <AppWindow
+              key={activeTabData.id}
               id={activeTabData.id}
               title={activeTabData.label}
               icon={activeTabData.icon}
