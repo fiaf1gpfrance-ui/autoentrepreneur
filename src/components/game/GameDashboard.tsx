@@ -77,6 +77,13 @@ import { EventCalendarWidget } from "./EventCalendarWidget";
 import { TaskListWidget } from "./TaskListWidget";
 import { TaxAlertWidget } from "./TaxAlertWidget";
 import { EmployeeChartWidget } from "./EmployeeChartWidget";
+import { StockMarketWidget } from "./StockMarketWidget";
+import { CryptoWidget } from "./CryptoWidget";
+import { NewsTickerWidget } from "./NewsTickerWidget";
+import { MiniMapWidget } from "./MiniMapWidget";
+import { CompanyCultureWidget } from "./CompanyCultureWidget";
+import { SettingsPanel } from "./SettingsPanel";
+import { AchievementPopup } from "./AchievementPopup";
 import { GameSave } from "@/hooks/useGameSave";
 import { GameSettings } from "./CompanySetup";
 import { InvestorsPanel } from "./InvestorsPanel";
@@ -90,6 +97,7 @@ import {
   claimDailyReward,
   cleanExpiredBoosts,
 } from "@/utils/currencyEngine";
+import { playSound, initSounds } from "@/utils/soundEngine";
 import { 
   Wallet, 
   TrendingUp, 
@@ -181,7 +189,14 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'tasks', isVisible: true, isMinimized: false, position: { x: 700, y: 380 } },
     { id: 'taxes', isVisible: true, isMinimized: false, position: { x: 1000, y: 80 } },
     { id: 'employees', isVisible: true, isMinimized: false, position: { x: 1000, y: 340 } },
+    { id: 'stocks', isVisible: true, isMinimized: false, position: { x: 1280, y: 80 } },
+    { id: 'crypto', isVisible: true, isMinimized: false, position: { x: 1280, y: 340 } },
+    { id: 'news', isVisible: true, isMinimized: false, position: { x: 100, y: 560 } },
+    { id: 'worldmap', isVisible: true, isMinimized: false, position: { x: 400, y: 580 } },
+    { id: 'culture', isVisible: true, isMinimized: false, position: { x: 700, y: 620 } },
   ]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [pendingAchievement, setPendingAchievement] = useState<any>(null);
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     difficulty: 'normal',
     gameMode: 'career',
@@ -195,8 +210,15 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   // Track max z-index for window focus
   const [maxZIndex, setMaxZIndex] = useState(1);
 
+  // Initialize sounds on mount
+  useEffect(() => {
+    initSounds();
+    playSound('startup');
+  }, []);
+
   // Multi-window management functions
   const openApp = useCallback((appId: TabId) => {
+    playSound('open');
     setOpenWindows(prev => {
       const existing = prev.find(w => w.id === appId);
       if (existing) {
@@ -215,6 +237,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   }, [maxZIndex]);
 
   const closeWindow = useCallback((windowId: TabId) => {
+    playSound('close');
     setOpenWindows(prev => prev.filter(w => w.id !== windowId));
     // Set active to next window or null
     setOpenWindows(prev => {
@@ -227,6 +250,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   }, []);
 
   const minimizeWindow = useCallback((windowId: TabId) => {
+    playSound('minimize');
     setOpenWindows(prev => prev.map(w => 
       w.id === windowId ? { ...w, isMinimized: true } : w
     ));
@@ -1492,6 +1516,55 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                       }}
                     />
                   ),
+                  stocks: (
+                    <StockMarketWidget
+                      treasury={company.treasury}
+                      onBuyStock={(symbol, amount) => {
+                        playSound('coin');
+                        toast.success(`Achat de ${symbol} effectué !`);
+                      }}
+                      onSellStock={(symbol, amount) => {
+                        playSound('coin');
+                        toast.info(`Vente de ${symbol} effectuée !`);
+                      }}
+                    />
+                  ),
+                  crypto: (
+                    <CryptoWidget
+                      treasury={company.treasury}
+                      onBuyCrypto={(symbol, amount) => {
+                        playSound('coin');
+                        toast.success(`Investissement en ${symbol} effectué !`);
+                      }}
+                    />
+                  ),
+                  news: (
+                    <NewsTickerWidget
+                      economicWeather={gameState.economicWeather}
+                      day={gameState.day}
+                    />
+                  ),
+                  worldmap: (
+                    <MiniMapWidget
+                      homeCountry="FR"
+                      markets={company.foreignMarkets.map(m => ({
+                        country: m.country,
+                        code: m.id.toUpperCase(),
+                        penetration: m.penetration,
+                        hasSubsidiary: m.hasSubsidiary
+                      }))}
+                      subsidiaries={company.subsidiaries.length}
+                    />
+                  ),
+                  culture: (
+                    <CompanyCultureWidget
+                      employees={company.employees.length}
+                      moral={company.employees.length > 0 
+                        ? Math.round(company.employees.reduce((sum, e) => sum + e.moral, 0) / company.employees.length)
+                        : 70}
+                      credibility={company.credibility}
+                    />
+                  ),
                 };
 
                 const widgetSizes: Record<string, { width: number; height: number }> = {
@@ -1503,6 +1576,11 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                   tasks: { width: 260, height: 220 },
                   taxes: { width: 280, height: 260 },
                   employees: { width: 280, height: 240 },
+                  stocks: { width: 300, height: 280 },
+                  crypto: { width: 280, height: 260 },
+                  news: { width: 320, height: 200 },
+                  worldmap: { width: 300, height: 240 },
+                  culture: { width: 280, height: 220 },
                 };
 
                 const widgetTitles: Record<string, string> = {
@@ -1514,6 +1592,11 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
                   tasks: 'Tâches',
                   taxes: 'Alertes fiscales',
                   employees: 'Employés',
+                  stocks: 'Bourse',
+                  crypto: 'Crypto',
+                  news: 'Actualités',
+                  worldmap: 'Présence mondiale',
+                  culture: 'Culture',
                 };
 
                 return (
@@ -1631,6 +1714,20 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
           </div>
         </div>
       )}
+
+      {/* Settings Panel */}
+      <SettingsPanel
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onReset={onReset}
+        onSave={handleSave}
+      />
+
+      {/* Achievement Popup */}
+      <AchievementPopup
+        achievement={pendingAchievement}
+        onClose={() => setPendingAchievement(null)}
+      />
     </div>
   );
 }
