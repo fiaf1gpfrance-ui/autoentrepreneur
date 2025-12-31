@@ -458,11 +458,9 @@ export function processDayTick(state: GameState): GameState {
     return decl;
   });
 
-  // Check credibility game over - simplified
-  if (company.credibility <= 0) {
-    newState.gameOver = true;
-    newState.gameOverReason = "Faillite : Votre crédibilité est tombée à zéro suite aux contrôles fiscaux.";
-  }
+  // Check credibility game over - Only at end of year with 25% chance if credibility < 25
+  // This event is now handled separately, not automatically triggering game over
+  // The game over for credibility is managed by GameDashboard with Konami protection
 
   // Generate random event
   const newEvent = generateRandomEvent(newState.day, newState.economicWeather);
