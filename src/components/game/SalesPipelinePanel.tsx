@@ -1,52 +1,36 @@
 import { useState, useCallback } from "react";
 import { 
-  Lead, 
-  Deal, 
-  LeadSource, 
-  DealStage, 
-  SalesPipeline,
-  CustomerFeedback 
-} from "@/types/advancedSystems";
+  SalesPipelineData, 
+  LeadData, 
+  DealData, 
+  CustomerFeedbackData 
+} from "@/types/game";
 import { 
   generateLead, 
   generateLeadBatch, 
   qualifyLead, 
   createDealFromLead, 
-  advanceDealStage, 
-  addDealActivity,
-  calculatePipelineMetrics,
-  calculateNPS,
-  calculateCSAT,
-  LEAD_SOURCES,
-  STAGE_PROBABILITIES 
+  LEAD_SOURCES 
 } from "@/utils/salesEngine";
 import { formatCurrency } from "@/utils/gameEngine";
-import { GaugeBar } from "./GaugeBar";
 import { 
   Users,
   TrendingUp,
   Target,
   Phone,
-  Mail,
-  Calendar,
   DollarSign,
   BarChart3,
-  AlertTriangle,
   CheckCircle,
-  Clock,
   ArrowRight,
   Star,
   Briefcase,
   Search,
   Filter,
-  Plus,
   UserPlus,
   Megaphone,
   Zap,
-  ThumbsUp,
   ThumbsDown,
   MessageSquare,
-  ArrowUpRight,
   Globe,
   Share2,
   Handshake,
@@ -55,18 +39,21 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+type LeadSource = 'website' | 'referral' | 'cold_call' | 'trade_show' | 'social_media' | 'advertising' | 'partnership';
+type DealStage = 'prospecting' | 'qualification' | 'needs_analysis' | 'proposal' | 'negotiation' | 'closing' | 'won' | 'lost';
+
 interface SalesPipelinePanelProps {
-  pipeline: SalesPipeline;
-  customerFeedback: CustomerFeedback[];
+  pipeline: SalesPipelineData;
+  customerFeedback: CustomerFeedbackData[];
   treasury: number;
   currentDay: number;
-  onGenerateLead: (lead: Lead) => void;
-  onGenerateLeadBatch: (leads: Lead[], cost: number) => void;
+  onGenerateLead: (lead: LeadData) => void;
+  onGenerateLeadBatch: (leads: LeadData[], cost: number) => void;
   onQualifyLead: (leadId: string, qualified: boolean, newScore: number) => void;
-  onConvertToDeaL: (leadId: string, deal: Deal) => void;
+  onConvertToDeaL: (leadId: string, deal: DealData) => void;
   onAdvanceDeal: (dealId: string, success: boolean) => void;
   onAddActivity: (dealId: string, activityType: string, description: string) => void;
-  onRecordFeedback: (feedback: CustomerFeedback) => void;
+  onRecordFeedback: (feedback: CustomerFeedbackData) => void;
 }
 
 const STAGE_CONFIG: Record<DealStage, { label: string; color: string; icon: typeof Target }> = {
@@ -108,10 +95,25 @@ export function SalesPipelinePanel({
   const [selectedStage, setSelectedStage] = useState<DealStage | null>(null);
   const [leadBudget, setLeadBudget] = useState(1000);
 
-  // Calculate metrics
-  const metrics = calculatePipelineMetrics(pipeline);
-  const nps = calculateNPS(customerFeedback);
-  const csat = calculateCSAT(customerFeedback);
+  // Calculate metrics locally
+  const metrics = {
+    totalValue: pipeline.deals.reduce((sum, d) => sum + d.value, 0),
+    weightedValue: pipeline.deals.reduce((sum, d) => sum + d.value * (d.probability / 100), 0),
+    avgDealSize: pipeline.deals.length > 0 ? pipeline.deals.reduce((sum, d) => sum + d.value, 0) / pipeline.deals.length : 0,
+    stageBreakdown: {} as Record<DealStage, number>,
+  };
+  
+  // Calculate NPS from feedback
+  const npsResponses = customerFeedback.filter(f => f.type === 'nps' && f.score !== undefined);
+  const promoters = npsResponses.filter(f => (f.score || 0) >= 9).length;
+  const detractors = npsResponses.filter(f => (f.score || 0) <= 6).length;
+  const nps = npsResponses.length > 0 ? Math.round(((promoters - detractors) / npsResponses.length) * 100) : 0;
+  
+  // Calculate CSAT
+  const csatResponses = customerFeedback.filter(f => f.type === 'csat' && f.score !== undefined);
+  const csat = csatResponses.length > 0 
+    ? Math.round(csatResponses.reduce((sum, f) => sum + (f.score || 0), 0) / csatResponses.length * 10) 
+    : 0;
 
   // Filter leads by status
   const newLeads = pipeline.leads.filter(l => l.status === 'new');
@@ -144,8 +146,8 @@ export function SalesPipelinePanel({
     toast.success(`${leads.length} leads générés pour ${formatCurrency(cost)}`);
   }, [treasury, leadBudget, currentDay, onGenerateLeadBatch]);
 
-  const handleQualifyLead = useCallback((lead: Lead) => {
-    const { qualified, score } = qualifyLead(lead, 70); // 70 = average skill level
+  const handleQualifyLead = useCallback((lead: LeadData) => {
+    const { qualified, score } = qualifyLead(lead as any, 70); // 70 = average skill level
     onQualifyLead(lead.id, qualified, score);
     if (qualified) {
       toast.success(`${lead.companyName} qualifié avec un score de ${score}!`);
@@ -154,13 +156,13 @@ export function SalesPipelinePanel({
     }
   }, [onQualifyLead]);
 
-  const handleConvertToDeal = useCallback((lead: Lead) => {
-    const deal = createDealFromLead(lead, currentDay);
-    onConvertToDeaL(lead.id, deal);
+  const handleConvertToDeal = useCallback((lead: LeadData) => {
+    const deal = createDealFromLead(lead as any, currentDay);
+    onConvertToDeaL(lead.id, deal as DealData);
     toast.success(`Opportunité créée: ${deal.name}`);
   }, [currentDay, onConvertToDeaL]);
 
-  const handleAdvanceDeal = useCallback((deal: Deal, success: boolean) => {
+  const handleAdvanceDeal = useCallback((deal: DealData, success: boolean) => {
     onAdvanceDeal(deal.id, success);
     if (success) {
       if (deal.stage === 'closing') {
@@ -419,7 +421,7 @@ export function SalesPipelinePanel({
                     <p className="text-xs font-medium">{config.label}</p>
                     <p className="text-lg font-bold">{stageDeals.length}</p>
                     <p className="text-xs text-muted-foreground">{formatCurrency(stageValue)}</p>
-                    <p className="text-[10px] text-muted-foreground">{STAGE_PROBABILITIES[stage]}% prob.</p>
+                    <p className="text-[10px] text-muted-foreground">{stageDeals.length > 0 ? Math.round((stageDeals.filter(d => d.probability >= 50).length / stageDeals.length) * 100) : 0}% prob.</p>
                   </button>
                 );
               })}
@@ -477,7 +479,7 @@ export function SalesPipelinePanel({
                           className="p-2 rounded-lg bg-success/10 hover:bg-success/20 text-success"
                           title="Avancer"
                         >
-                          <ArrowUpRight className="w-4 h-4" />
+                          <ArrowRight className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleAdvanceDeal(deal, false)}
@@ -673,12 +675,18 @@ export function SalesPipelinePanel({
             <h4 className="font-display font-semibold mb-3">Net Promoter Score</h4>
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <GaugeBar 
-                  value={Math.max(0, nps + 100)} 
-                  max={200} 
-                  colorClass={nps >= 50 ? "bg-success" : nps >= 0 ? "bg-warning" : "bg-destructive"}
-                  label={nps >= 50 ? "Excellent" : nps >= 0 ? "Correct" : "À améliorer"}
-                />
+                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                  <div 
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      nps >= 50 ? "bg-success" : nps >= 0 ? "bg-warning" : "bg-destructive"
+                    )}
+                    style={{ width: `${Math.max(0, Math.min(100, (nps + 100) / 2))}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {nps >= 50 ? "Excellent" : nps >= 0 ? "Correct" : "À améliorer"}
+                </p>
               </div>
               <div className="text-center">
                 <p className={cn(
