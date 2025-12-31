@@ -154,8 +154,14 @@ export interface FleetStatistics {
   productivityContribution: number;
 }
 
-// Catalogue de véhicules disponibles
-export const VEHICLE_CATALOG: VehicleModel[] = [
+// Import du catalogue étendu
+import { EXTENDED_VEHICLE_CATALOG } from '@/data/vehicleCatalog';
+
+// Catalogue de véhicules disponibles (utilise le catalogue étendu)
+export const VEHICLE_CATALOG: VehicleModel[] = EXTENDED_VEHICLE_CATALOG;
+
+// Ancien catalogue conservé pour compatibilité
+export const LEGACY_VEHICLE_CATALOG: VehicleModel[] = [
   // BERLINES PREMIUM
   {
     id: 'bmw_320d',
