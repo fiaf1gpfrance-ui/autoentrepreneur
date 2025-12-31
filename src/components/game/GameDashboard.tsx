@@ -100,6 +100,7 @@ import {
   cleanExpiredBoosts,
 } from "@/utils/currencyEngine";
 import { playSound, initSounds } from "@/utils/soundEngine";
+import { useKonami } from "@/contexts/KonamiContext";
 import { 
   Wallet, 
   TrendingUp, 
@@ -201,8 +202,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   ]);
   const [showSettings, setShowSettings] = useState(false);
   const [pendingAchievement, setPendingAchievement] = useState<any>(null);
-  const [konamiActive, setKonamiActive] = useState(false);
-  const [konamiSequence, setKonamiSequence] = useState<string[]>([]);
+  const { konamiActive } = useKonami();
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     difficulty: 'normal',
     gameMode: 'career',
@@ -215,27 +215,6 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   
   // Track max z-index for window focus
   const [maxZIndex, setMaxZIndex] = useState(1);
-
-  // Konami Code: ↑↑↓↓←→←→BA - Protège la crédibilité et bordure dorée
-  const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
-  
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const newSequence = [...konamiSequence, e.code].slice(-10);
-      setKonamiSequence(newSequence);
-      
-      if (newSequence.length === 10 && newSequence.every((key, i) => key === KONAMI_CODE[i])) {
-        if (!konamiActive) {
-          setKonamiActive(true);
-          toast.success('🎮 KONAMI CODE ACTIVÉ ! Mode protégé : crédibilité boostée, faillite impossible !', { duration: 5000 });
-          playSound('achievement');
-        }
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [konamiSequence, konamiActive]);
 
   // Credibility bankruptcy check - only at end of year (day 30, month 12) with 25% chance if credibility < 25
   // Never triggers if Konami code is active
@@ -1807,16 +1786,6 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
         achievement={pendingAchievement}
         onClose={() => setPendingAchievement(null)}
       />
-      
-      {/* Konami Code Golden Border */}
-      {konamiActive && (
-        <>
-          <div className="fixed top-0 left-0 right-0 h-[10px] bg-gradient-to-r from-yellow-500 via-yellow-300 to-yellow-500 z-[9999] animate-pulse shadow-lg shadow-yellow-500/50" />
-          <div className="fixed bottom-0 left-0 right-0 h-[10px] bg-gradient-to-r from-yellow-500 via-yellow-300 to-yellow-500 z-[9999] animate-pulse shadow-lg shadow-yellow-500/50" />
-          <div className="fixed top-0 left-0 bottom-0 w-[10px] bg-gradient-to-b from-yellow-500 via-yellow-300 to-yellow-500 z-[9999] animate-pulse shadow-lg shadow-yellow-500/50" />
-          <div className="fixed top-0 right-0 bottom-0 w-[10px] bg-gradient-to-b from-yellow-500 via-yellow-300 to-yellow-500 z-[9999] animate-pulse shadow-lg shadow-yellow-500/50" />
-        </>
-      )}
     </div>
   );
 }
