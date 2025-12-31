@@ -89,6 +89,8 @@ import { GameSettings } from "./CompanySetup";
 import { InvestorsPanel } from "./InvestorsPanel";
 import { CompetitionPanel } from "./CompetitionPanel";
 import { RichEventsPanel } from "./RichEventsPanel";
+import { TradingPanel } from "./TradingPanel";
+import { VehicleFleetPanel } from "./VehicleFleetPanel";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   calculateDailyCoinGain, 
@@ -138,6 +140,8 @@ import {
   Eye,
   PieChart,
   Handshake,
+  Car,
+  LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -154,7 +158,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'richevents';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'richevents' | 'trading' | 'vehicles';
 
 interface OpenWindow {
   id: TabId;
@@ -197,6 +201,8 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   ]);
   const [showSettings, setShowSettings] = useState(false);
   const [pendingAchievement, setPendingAchievement] = useState<any>(null);
+  const [konamiActive, setKonamiActive] = useState(false);
+  const [konamiSequence, setKonamiSequence] = useState<string[]>([]);
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     difficulty: 'normal',
     gameMode: 'career',
@@ -209,6 +215,25 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
   
   // Track max z-index for window focus
   const [maxZIndex, setMaxZIndex] = useState(1);
+
+  // Konami Code: ↑↑↓↓←→←→BA - Protège la crédibilité
+  const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+  
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const newSequence = [...konamiSequence, e.code].slice(-10);
+      setKonamiSequence(newSequence);
+      
+      if (newSequence.length === 10 && newSequence.every((key, i) => key === KONAMI_CODE[i])) {
+        setKonamiActive(true);
+        toast.success('🎮 KONAMI CODE ACTIVÉ ! Crédibilité protégée !', { duration: 5000 });
+        playSound('achievement');
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [konamiSequence]);
 
   // Initialize sounds on mount
   useEffect(() => {
@@ -1148,6 +1173,8 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'shop', label: 'Boutique', icon: ShoppingCart },
     { id: 'progression', label: 'Progression', icon: Star },
     { id: 'achievements', label: 'Trophées', icon: Trophy },
+    { id: 'trading', label: 'Trading', icon: LineChart },
+    { id: 'vehicles', label: 'Véhicules', icon: Car },
     { id: 'investors', label: 'Investisseurs', icon: PieChart },
     { id: 'competition', label: 'Concurrence', icon: Swords },
     { id: 'richevents', label: 'Événements', icon: Eye },
@@ -1199,6 +1226,8 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
       legal: "text-slate-400",
       taxes: "text-gray-400",
       gameplay: "text-zinc-400",
+      trading: "text-emerald-500",
+      vehicles: "text-amber-500",
     };
     return colors[id] || "text-primary";
   };
@@ -1356,6 +1385,21 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
           }}
           onAddActivity={(dealId, activityType, description) => setGameState(prev => ({ ...prev, company: { ...prev.company!, salesPipeline: { ...prev.company!.salesPipeline, deals: (prev.company!.salesPipeline?.deals || []).map(d => d.id === dealId ? { ...d, activities: [...d.activities, { id: `activity_${Date.now()}`, type: activityType as 'call' | 'email' | 'meeting' | 'demo' | 'proposal' | 'negotiation', date: gameState.day, description }] } : d) } } }))}
           onRecordFeedback={(feedback) => setGameState(prev => ({ ...prev, company: { ...prev.company!, customerFeedback: [...(prev.company!.customerFeedback || []), feedback] } }))}
+        />;
+      case 'trading':
+        return <TradingPanel 
+          treasury={company.treasury} 
+          day={gameState.day} 
+          onTreasuryChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + amount } }))} 
+        />;
+      case 'vehicles':
+        return <VehicleFleetPanel 
+          treasury={company.treasury} 
+          employees={company.employees} 
+          day={gameState.day}
+          onTreasuryChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + amount } }))}
+          onReputationChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, credibility: Math.min(100, Math.max(konamiActive ? 1 : 0, prev.company!.credibility + amount)) } }))}
+          onProductivityChange={(amount) => toast.info(`Productivité ${amount >= 0 ? '+' : ''}${amount}%`)}
         />;
       default:
         return <DesktopOverview company={company} gameState={gameState} onDismissEvent={dismissEvent} />;
