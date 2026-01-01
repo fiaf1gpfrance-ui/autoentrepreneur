@@ -398,11 +398,11 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
           <p className="text-muted-foreground text-sm">Le Défi Citoyen</p>
         </div>
 
-        <div className="game-panel max-h-[75vh] overflow-hidden flex flex-col">
+        <div className="game-panel h-[75vh] overflow-hidden flex flex-col">
           {renderStepIndicator()}
           
           <ScrollArea className="flex-1 min-h-0 pr-2">
-            <div className="space-y-4 pb-4">
+            <div className="space-y-4 pb-10">
 
           {/* Step 1: Difficulty */}
           {step === 1 && (
