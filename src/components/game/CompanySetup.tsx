@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Company, LegalStatus, Sector, LEGAL_STATUS_MODIFIERS } from "@/types/game";
 import { LEGAL_STRUCTURES, LegalStructureType, LegalStructure } from "@/types/legalStructures";
 import { 
@@ -70,6 +71,13 @@ import {
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+// New modular components
+import { SetupBackground } from "./setup/SetupBackground";
+import { StepIndicator } from "./setup/SetupCarousel";
+import { OptionCard, OptionListItem } from "./setup/OptionCard";
+import { StepHeader } from "./setup/StepHeader";
+import { NavigationButtons } from "./setup/NavigationButtons";
+
 interface CompanySetupProps {
   onComplete: (company: Company, settings: GameSettings) => void;
 }
@@ -86,7 +94,6 @@ export interface GameSettings {
   office?: OfficeChoice;
   coFounders?: CoFounder[];
   businessPlan?: BusinessPlan;
-  // New advanced settings
   managementStyle?: ManagementStyle;
   cultureType?: CultureType;
   hrPolicy?: HRPolicy;
@@ -154,67 +161,67 @@ const structuresByCategory = {
   special: { label: 'Formes Spéciales', icon: Globe, structures: ['gie', 'geie', 'holding', 'se', 'sne'] as LegalStructureType[] },
 };
 
-const sectorOptions: { value: Sector; label: string; description: string; icon: typeof Cpu }[] = [
-  { value: 'tech', label: "Tech", description: "Marges élevées, salaires hauts, clients volatils.", icon: Cpu },
-  { value: 'artisanat', label: "Artisanat", description: "Marges faibles, clients fidèles, croissance lente.", icon: Wrench },
-  { value: 'services', label: "Services", description: "Équilibré. Marges correctes, flexibilité moyenne.", icon: HeadphonesIcon },
-  { value: 'industrie', label: "Industrie", description: "Investissements lourds, clients stables, marges correctes.", icon: Cog },
+const sectorOptions = [
+  { value: 'tech' as Sector, label: "Tech", description: "Marges élevées, salaires hauts, clients volatils.", icon: Cpu },
+  { value: 'artisanat' as Sector, label: "Artisanat", description: "Marges faibles, clients fidèles, croissance lente.", icon: Wrench },
+  { value: 'services' as Sector, label: "Services", description: "Équilibré. Marges correctes, flexibilité moyenne.", icon: HeadphonesIcon },
+  { value: 'industrie' as Sector, label: "Industrie", description: "Investissements lourds, clients stables, marges correctes.", icon: Cog },
 ];
 
-const difficultyOptions: { value: Difficulty; label: string; description: string; icon: typeof Shield; color: string }[] = [
-  { value: 'tutorial', label: "Tutoriel", description: "Apprentissage guidé, erreurs pardonnées.", icon: GraduationCap, color: "text-blue-400" },
-  { value: 'easy', label: "Facile", description: "Économie favorable, événements rares.", icon: Heart, color: "text-success" },
-  { value: 'normal', label: "Normal", description: "Simulation réaliste.", icon: Shield, color: "text-amber-400" },
-  { value: 'hard', label: "Difficile", description: "Économie instable, marges serrées.", icon: Flame, color: "text-orange-500" },
-  { value: 'hardcore', label: "Hardcore", description: "Aucune erreur tolérée.", icon: Trophy, color: "text-destructive" },
+const difficultyOptions = [
+  { value: 'tutorial' as Difficulty, label: "Tutoriel", description: "Apprentissage guidé, erreurs pardonnées.", icon: GraduationCap, color: "text-blue-400" },
+  { value: 'easy' as Difficulty, label: "Facile", description: "Économie favorable, événements rares.", icon: Heart, color: "text-success" },
+  { value: 'normal' as Difficulty, label: "Normal", description: "Simulation réaliste.", icon: Shield, color: "text-amber-400" },
+  { value: 'hard' as Difficulty, label: "Difficile", description: "Économie instable, marges serrées.", icon: Flame, color: "text-orange-500" },
+  { value: 'hardcore' as Difficulty, label: "Hardcore", description: "Aucune erreur tolérée.", icon: Trophy, color: "text-destructive" },
 ];
 
-const gameModeOptions: { value: GameMode; label: string; description: string; icon: typeof Rocket }[] = [
-  { value: 'sandbox', label: "Bac à sable", description: "Liberté totale, expérimentez !", icon: Sparkles },
-  { value: 'career', label: "Carrière", description: "Progression structurée.", icon: Briefcase },
-  { value: 'challenge', label: "Défis", description: "Objectifs avec contraintes.", icon: Target },
-  { value: 'speedrun', label: "Speedrun", description: "Atteignez le million vite !", icon: Zap },
-  { value: 'survival', label: "Survie", description: "Crises fréquentes.", icon: Shield },
+const gameModeOptions = [
+  { value: 'sandbox' as GameMode, label: "Bac à sable", description: "Liberté totale, expérimentez !", icon: Sparkles },
+  { value: 'career' as GameMode, label: "Carrière", description: "Progression structurée.", icon: Briefcase },
+  { value: 'challenge' as GameMode, label: "Défis", description: "Objectifs avec contraintes.", icon: Target },
+  { value: 'speedrun' as GameMode, label: "Speedrun", description: "Atteignez le million vite !", icon: Zap },
+  { value: 'survival' as GameMode, label: "Survie", description: "Crises fréquentes.", icon: Shield },
 ];
 
-const founderOptions: { value: FounderType; label: string; description: string; bonus: string; icon: typeof User }[] = [
-  { value: 'visionary', label: "Visionnaire", description: "Vous voyez au-delà.", bonus: "+20% Innovation", icon: Lightbulb },
-  { value: 'manager', label: "Gestionnaire", description: "L'organisation est votre force.", bonus: "+15% Productivité", icon: Users },
-  { value: 'technical', label: "Technique", description: "Expert dans votre domaine.", bonus: "+25% R&D", icon: Cpu },
-  { value: 'commercial', label: "Commercial", description: "La vente n'a pas de secrets.", bonus: "+20% Ventes", icon: Handshake },
-  { value: 'financier', label: "Financier", description: "Les chiffres sont votre langage.", bonus: "+10% Marges", icon: TrendingUp },
-  { value: 'diplomat', label: "Diplomate", description: "Vous gérez les relations.", bonus: "+20% Réputation", icon: Globe },
+const founderOptions = [
+  { value: 'visionary' as FounderType, label: "Visionnaire", description: "Vous voyez au-delà.", bonus: "+20% Innovation", icon: Lightbulb },
+  { value: 'manager' as FounderType, label: "Gestionnaire", description: "L'organisation est votre force.", bonus: "+15% Productivité", icon: Users },
+  { value: 'technical' as FounderType, label: "Technique", description: "Expert dans votre domaine.", bonus: "+25% R&D", icon: Cpu },
+  { value: 'commercial' as FounderType, label: "Commercial", description: "La vente n'a pas de secrets.", bonus: "+20% Ventes", icon: Handshake },
+  { value: 'financier' as FounderType, label: "Financier", description: "Les chiffres sont votre langage.", bonus: "+10% Marges", icon: TrendingUp },
+  { value: 'diplomat' as FounderType, label: "Diplomate", description: "Vous gérez les relations.", bonus: "+20% Réputation", icon: Globe },
 ];
 
-const locationOptions: { value: Location; label: string; description: string; bonus: string }[] = [
-  { value: 'paris', label: "Paris", description: "Capitale économique.", bonus: "+30% Revenus, +40% Coûts" },
-  { value: 'lyon', label: "Lyon", description: "Carrefour industriel.", bonus: "+15% Industrie" },
-  { value: 'marseille', label: "Marseille", description: "Port méditerranéen.", bonus: "+25% Import/Export" },
-  { value: 'bordeaux', label: "Bordeaux", description: "Élégance et innovation.", bonus: "+15% Tech" },
-  { value: 'lille', label: "Lille", description: "Proximité européenne.", bonus: "+20% Commerce EU" },
-  { value: 'nantes', label: "Nantes", description: "Créativité et écologie.", bonus: "+25% Innovation" },
-  { value: 'toulouse', label: "Toulouse", description: "Capitale aérospatiale.", bonus: "+30% Tech/Industrie" },
-  { value: 'strasbourg', label: "Strasbourg", description: "Porte de l'Europe.", bonus: "+30% International" },
+const locationOptions = [
+  { value: 'paris' as Location, label: "Paris", description: "Capitale économique.", bonus: "+30% Revenus, +40% Coûts", icon: MapPin },
+  { value: 'lyon' as Location, label: "Lyon", description: "Carrefour industriel.", bonus: "+15% Industrie", icon: MapPin },
+  { value: 'marseille' as Location, label: "Marseille", description: "Port méditerranéen.", bonus: "+25% Import/Export", icon: MapPin },
+  { value: 'bordeaux' as Location, label: "Bordeaux", description: "Élégance et innovation.", bonus: "+15% Tech", icon: MapPin },
+  { value: 'lille' as Location, label: "Lille", description: "Proximité européenne.", bonus: "+20% Commerce EU", icon: MapPin },
+  { value: 'nantes' as Location, label: "Nantes", description: "Créativité et écologie.", bonus: "+25% Innovation", icon: MapPin },
+  { value: 'toulouse' as Location, label: "Toulouse", description: "Capitale aérospatiale.", bonus: "+30% Tech/Industrie", icon: MapPin },
+  { value: 'strasbourg' as Location, label: "Strasbourg", description: "Porte de l'Europe.", bonus: "+30% International", icon: MapPin },
 ];
 
-const startingBonusOptions: { value: StartingBonus; label: string; description: string; effect: string; icon: typeof Gift }[] = [
-  { value: 'none', label: "Aucun", description: "Partez de zéro.", effect: "Pas de bonus", icon: Shield },
-  { value: 'extra_cash', label: "Héritage", description: "Un oncle généreux.", effect: "+50 000€", icon: Coins },
-  { value: 'skilled_team', label: "Dream Team", description: "Équipe expérimentée.", effect: "+3 employés", icon: Users },
-  { value: 'reputation', label: "Réputation", description: "Nom déjà connu.", effect: "+30 Réputation", icon: Star },
-  { value: 'technology', label: "Innovateur", description: "Technologies existantes.", effect: "+3 technologies", icon: Cpu },
-  { value: 'contacts', label: "Carnet d'adresses", description: "Bonnes personnes.", effect: "+5 clients", icon: Handshake },
-  { value: 'lucky', label: "Chanceux", description: "La chance vous sourit.", effect: "+15% événements positifs", icon: Sparkles },
+const startingBonusOptions = [
+  { value: 'none' as StartingBonus, label: "Aucun", description: "Partez de zéro.", effect: "Pas de bonus", icon: Shield },
+  { value: 'extra_cash' as StartingBonus, label: "Héritage", description: "Un oncle généreux.", effect: "+50 000€", icon: Coins },
+  { value: 'skilled_team' as StartingBonus, label: "Dream Team", description: "Équipe expérimentée.", effect: "+3 employés", icon: Users },
+  { value: 'reputation' as StartingBonus, label: "Réputation", description: "Nom déjà connu.", effect: "+30 Réputation", icon: Star },
+  { value: 'technology' as StartingBonus, label: "Innovateur", description: "Technologies existantes.", effect: "+3 technologies", icon: Cpu },
+  { value: 'contacts' as StartingBonus, label: "Carnet d'adresses", description: "Bonnes personnes.", effect: "+5 clients", icon: Handshake },
+  { value: 'lucky' as StartingBonus, label: "Chanceux", description: "La chance vous sourit.", effect: "+15% événements positifs", icon: Sparkles },
 ];
 
-const objectiveOptions: { value: GameObjective; label: string; description: string; target: string; icon: typeof Trophy }[] = [
-  { value: 'millionaire', label: "Millionnaire", description: "Accumulez une fortune.", target: "1 000 000€", icon: Coins },
-  { value: 'empire', label: "Empire", description: "Construisez un conglomérat.", target: "100 employés", icon: Crown },
-  { value: 'innovation', label: "Pionnier", description: "Révolutionnez le secteur.", target: "Toutes les technologies", icon: Lightbulb },
-  { value: 'social', label: "Patron idéal", description: "Entreprise où tous veulent travailler.", target: "Moral 90%+", icon: Heart },
-  { value: 'international', label: "Mondial", description: "Conquérez le monde.", target: "20 pays", icon: Globe },
-  { value: 'legacy', label: "Héritage", description: "Laissez une marque.", target: "50 achievements", icon: Trophy },
-  { value: 'freedom', label: "Liberté", description: "Pas d'objectif.", target: "Jouez libre !", icon: Rocket },
+const objectiveOptions = [
+  { value: 'millionaire' as GameObjective, label: "Millionnaire", description: "Accumulez une fortune.", target: "1 000 000€", icon: Coins },
+  { value: 'empire' as GameObjective, label: "Empire", description: "Construisez un conglomérat.", target: "100 employés", icon: Crown },
+  { value: 'innovation' as GameObjective, label: "Pionnier", description: "Révolutionnez le secteur.", target: "Toutes les technologies", icon: Lightbulb },
+  { value: 'social' as GameObjective, label: "Patron idéal", description: "Entreprise où tous veulent travailler.", target: "Moral 90%+", icon: Heart },
+  { value: 'international' as GameObjective, label: "Mondial", description: "Conquérez le monde.", target: "20 pays", icon: Globe },
+  { value: 'legacy' as GameObjective, label: "Héritage", description: "Laissez une marque.", target: "50 achievements", icon: Trophy },
+  { value: 'freedom' as GameObjective, label: "Liberté", description: "Pas d'objectif.", target: "Jouez libre !", icon: Rocket },
 ];
 
 const TOTAL_STEPS = 18;
@@ -234,7 +241,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
   const [objective, setObjective] = useState<GameObjective>('millionaire');
   const [expandedCategory, setExpandedCategory] = useState<string | null>('commercial');
   
-  // New advanced options
+  // Advanced options
   const [managementStyle, setManagementStyle] = useState<ManagementStyle>('participatif');
   const [cultureType, setCultureType] = useState<CultureType>('startup');
   const [hrPolicy, setHrPolicy] = useState<HRPolicy>('work_life_balance');
@@ -255,6 +262,13 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
     setSelectedLegalStructure(structureId);
     const mappedStatus = legalStatusMapping[structureId];
     setLegalStatus(mappedStatus);
+  };
+
+  const canProgress = (): boolean => {
+    if (step === 3 && !companyName.trim()) return false;
+    if (step === 5 && !selectedLegalStructure) return false;
+    if (step === 6 && !sector) return false;
+    return true;
   };
 
   const handleComplete = () => {
@@ -315,548 +329,631 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
     onComplete(company, settings);
   };
 
-  const renderStepIndicator = () => (
-    <div className="flex items-center justify-center gap-1 mb-6 flex-wrap">
-      {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
-        <div
-          key={s}
-          className={cn(
-            "w-2 h-2 rounded-full transition-all cursor-pointer",
-            s === step ? "bg-primary scale-125" : s < step ? "bg-primary/50 hover:bg-primary/70" : "bg-muted"
-          )}
-          onClick={() => s < step && setStep(s)}
-          title={`Étape ${s}`}
-        />
-      ))}
-    </div>
-  );
-
-  const renderOptionGrid = <T extends string>(
-    options: { value: T; label: string; description?: string; bonus?: string; icon?: typeof User }[],
-    selected: T,
-    onSelect: (value: T) => void,
-    cols: number = 2
-  ) => (
-    <div className={cn("grid gap-2", cols === 2 ? "grid-cols-2" : cols === 3 ? "grid-cols-3" : "grid-cols-4")}>
-      {options.map((option) => {
-        const Icon = option.icon;
-        return (
-          <button
-            key={option.value}
-            onClick={() => onSelect(option.value)}
-            className={cn(
-              "flex flex-col items-center gap-1 p-3 rounded-lg border text-center transition-all",
-              selected === option.value ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-            )}
-          >
-            {Icon && <Icon className={cn("w-5 h-5", selected === option.value ? "text-primary" : "text-muted-foreground")} />}
-            <span className="font-semibold text-xs">{option.label}</span>
-            {option.description && <span className="text-xs text-muted-foreground line-clamp-2">{option.description}</span>}
-            {option.bonus && <span className="text-xs text-primary">{option.bonus}</span>}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  const renderAdvancedOptionGrid = <T extends string>(
+  const renderAdvancedOptions = <T extends string>(
     options: Record<T, { label: string; description: string }>,
     selected: T,
     onSelect: (value: T) => void,
     icon: typeof User
   ) => {
     const Icon = icon;
+    const entries = Object.entries(options) as [T, { label: string; description: string }][];
     return (
-      <div className="grid grid-cols-2 gap-2">
-        {(Object.entries(options) as [T, { label: string; description: string }][]).map(([key, value]) => (
-          <button
+      <div className="grid grid-cols-2 gap-3">
+        {entries.map(([key, value], index) => (
+          <OptionCard
             key={key}
+            value={key}
+            label={value.label}
+            description={value.description}
+            icon={Icon}
+            isSelected={selected === key}
             onClick={() => onSelect(key)}
-            className={cn(
-              "flex flex-col items-start gap-1 p-3 rounded-lg border text-left transition-all",
-              selected === key ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <Icon className={cn("w-4 h-4", selected === key ? "text-primary" : "text-muted-foreground")} />
-              <span className="font-semibold text-xs">{value.label}</span>
-            </div>
-            <span className="text-xs text-muted-foreground line-clamp-2">{value.description}</span>
-          </button>
+            index={index}
+          />
         ))}
       </div>
     );
   };
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-3xl animate-fade-in">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-display font-bold text-foreground mb-1">
-            Simu'<span className="text-primary text-glow">Entrepreneur</span>
-          </h1>
-          <p className="text-muted-foreground text-sm">Le Défi Citoyen</p>
-        </div>
+  const renderStepContent = () => {
+    const animationProps = {
+      initial: { opacity: 0, y: 20 },
+      animate: { opacity: 1, y: 0 },
+      exit: { opacity: 0, y: -20 },
+      transition: { duration: 0.3 }
+    };
 
-        <div className="game-panel h-[75vh] overflow-hidden flex flex-col">
-          {renderStepIndicator()}
-          
-          <ScrollArea className="flex-1 min-h-0 pr-2">
-            <div className="space-y-4 pb-10">
-
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div key={step} {...animationProps} className="space-y-6">
           {/* Step 1: Difficulty */}
           {step === 1 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Niveau de difficulté</h2>
-                <p className="text-xs text-muted-foreground">Choisissez votre niveau de défi</p>
-              </div>
-              <div className="grid gap-2">
-                {difficultyOptions.map((option) => (
-                  <button
+            <>
+              <StepHeader icon={Shield} title="Niveau de difficulté" subtitle="Choisissez votre niveau de défi" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="grid grid-cols-1 gap-3">
+                {difficultyOptions.map((option, index) => (
+                  <OptionCard
                     key={option.value}
+                    value={option.value}
+                    label={option.label}
+                    description={option.description}
+                    icon={option.icon}
+                    isSelected={difficulty === option.value}
                     onClick={() => setDifficulty(option.value)}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg border text-left transition-all",
-                      difficulty === option.value ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-                    )}
-                  >
-                    <option.icon className={cn("w-5 h-5 shrink-0", option.color)} />
-                    <div className="flex-1">
-                      <h3 className="font-display font-semibold text-sm">{option.label}</h3>
-                      <p className="text-xs text-muted-foreground">{option.description}</p>
-                    </div>
-                  </button>
+                    index={index}
+                  />
                 ))}
               </div>
-            </div>
+            </>
           )}
 
           {/* Step 2: Game Mode */}
           {step === 2 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Mode de jeu</h2>
-                <p className="text-xs text-muted-foreground">Comment voulez-vous jouer ?</p>
+            <>
+              <StepHeader icon={Rocket} title="Mode de jeu" subtitle="Comment voulez-vous jouer ?" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="grid grid-cols-2 gap-3">
+                {gameModeOptions.map((option, index) => (
+                  <OptionCard
+                    key={option.value}
+                    value={option.value}
+                    label={option.label}
+                    description={option.description}
+                    icon={option.icon}
+                    isSelected={gameMode === option.value}
+                    onClick={() => setGameMode(option.value)}
+                    index={index}
+                  />
+                ))}
               </div>
-              {renderOptionGrid(gameModeOptions, gameMode, (v) => setGameMode(v as GameMode))}
-            </div>
+            </>
           )}
 
           {/* Step 3: Company Name */}
           {step === 3 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Nom de votre entreprise</h2>
-                <p className="text-xs text-muted-foreground">Choisissez un nom qui marquera les esprits</p>
-              </div>
-              <input
-                type="text"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Ma Super Entreprise"
-                maxLength={50}
-                className="w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+            <>
+              <StepHeader icon={Building2} title="Nom de votre entreprise" subtitle="Choisissez un nom qui marquera les esprits" step={step} totalSteps={TOTAL_STEPS} />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="relative"
+              >
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Ma Super Entreprise"
+                  maxLength={50}
+                  className="w-full bg-card/50 border-2 border-border rounded-2xl px-6 py-4 text-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/20 transition-all"
+                />
+                <motion.div
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+                  animate={{ opacity: companyName.length > 0 ? 1 : 0 }}
+                >
+                  {companyName.length}/50
+                </motion.div>
+              </motion.div>
+            </>
           )}
 
           {/* Step 4: Founder Type */}
           {step === 4 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Profil du fondateur</h2>
-                <p className="text-xs text-muted-foreground">Quel type d'entrepreneur êtes-vous ?</p>
+            <>
+              <StepHeader icon={User} title="Profil du fondateur" subtitle="Quel type d'entrepreneur êtes-vous ?" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="grid grid-cols-2 gap-3">
+                {founderOptions.map((option, index) => (
+                  <OptionCard
+                    key={option.value}
+                    value={option.value}
+                    label={option.label}
+                    description={option.description}
+                    bonus={option.bonus}
+                    icon={option.icon}
+                    isSelected={founderType === option.value}
+                    onClick={() => setFounderType(option.value)}
+                    index={index}
+                    showConfetti
+                  />
+                ))}
               </div>
-              {renderOptionGrid(founderOptions, founderType, (v) => setFounderType(v as FounderType))}
-            </div>
+            </>
           )}
 
           {/* Step 5: Legal Structure */}
           {step === 5 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Structure juridique</h2>
-                <p className="text-xs text-muted-foreground">Choisissez parmi 30+ formes juridiques</p>
-              </div>
-              
-              <div className="max-h-[300px] overflow-y-auto pr-2 space-y-2">
-                {Object.entries(structuresByCategory).map(([catKey, category]) => {
-                  const CategoryIcon = category.icon;
-                  const isExpanded = expandedCategory === catKey;
-                  const hasSelectedStructure = category.structures.some(s => s === selectedLegalStructure);
-                  
-                  return (
-                    <div key={catKey} className={cn(
-                      "rounded-lg border transition-all",
-                      hasSelectedStructure ? "border-primary bg-primary/5" : "border-border"
-                    )}>
-                      <button
-                        onClick={() => setExpandedCategory(isExpanded ? null : catKey)}
-                        className="w-full flex items-center justify-between p-2 hover:bg-secondary/50 rounded-lg"
+            <>
+              <StepHeader icon={Scale} title="Structure juridique" subtitle="Choisissez parmi 30+ formes juridiques" step={step} totalSteps={TOTAL_STEPS} />
+              <ScrollArea className="h-[350px] pr-4">
+                <div className="space-y-3">
+                  {Object.entries(structuresByCategory).map(([catKey, category]) => {
+                    const CategoryIcon = category.icon;
+                    const isExpanded = expandedCategory === catKey;
+                    const hasSelectedStructure = category.structures.some(s => s === selectedLegalStructure);
+                    
+                    return (
+                      <motion.div
+                        key={catKey}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                          "rounded-2xl border-2 transition-all overflow-hidden",
+                          hasSelectedStructure ? "border-primary bg-primary/5" : "border-border/50 bg-card/30"
+                        )}
                       >
-                        <div className="flex items-center gap-2">
-                          <CategoryIcon className={cn("w-4 h-4", hasSelectedStructure ? "text-primary" : "text-muted-foreground")} />
-                          <span className="font-semibold text-sm">{category.label}</span>
-                          <span className="text-xs text-muted-foreground">({category.structures.length})</span>
-                        </div>
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
-                      
-                      {isExpanded && (
-                        <div className="px-2 pb-2 space-y-1">
-                          {category.structures.map(structId => {
-                            const structure = LEGAL_STRUCTURES[structId];
-                            if (!structure) return null;
-                            const isSelected = selectedLegalStructure === structId;
-                            
-                            return (
-                              <button
-                                key={structId}
-                                onClick={() => handleSelectLegalStructure(structId)}
-                                className={cn(
-                                  "w-full flex flex-col p-2 rounded-lg border text-left transition-all",
-                                  isSelected ? "border-primary bg-primary/10" : "border-border/50 hover:border-primary/50"
-                                )}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-semibold text-xs">{structure.name}</span>
-                                  {isSelected && <Check className="w-3 h-3 text-primary" />}
-                                </div>
-                                <p className="text-xs text-muted-foreground">{structure.description}</p>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                        <button
+                          onClick={() => setExpandedCategory(isExpanded ? null : catKey)}
+                          className="w-full flex items-center justify-between p-4 hover:bg-card/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "p-2 rounded-xl",
+                              hasSelectedStructure ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                            )}>
+                              <CategoryIcon className="w-5 h-5" />
+                            </div>
+                            <span className="font-semibold">{category.label}</span>
+                            <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-full bg-muted">
+                              {category.structures.length}
+                            </span>
+                          </div>
+                          <motion.div
+                            animate={{ rotate: isExpanded ? 180 : 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                          </motion.div>
+                        </button>
+                        
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="px-4 pb-4 space-y-2">
+                                {category.structures.map((structId, index) => {
+                                  const structure = LEGAL_STRUCTURES[structId];
+                                  if (!structure) return null;
+                                  
+                                  return (
+                                    <OptionListItem
+                                      key={structId}
+                                      label={structure.name}
+                                      description={structure.description}
+                                      isSelected={selectedLegalStructure === structId}
+                                      onClick={() => handleSelectLegalStructure(structId)}
+                                      index={index}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </>
           )}
 
           {/* Step 6: Sector & Location */}
           {step === 6 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Secteur & Localisation</h2>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2 flex items-center gap-2">
-                  <Briefcase className="w-3 h-3" /> Secteur d'activité
-                </h3>
-                {renderOptionGrid(sectorOptions, sector || 'tech', (v) => setSector(v as Sector))}
-              </div>
+            <>
+              <StepHeader icon={Briefcase} title="Secteur & Localisation" subtitle="Définissez votre marché" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Briefcase className="w-4 h-4" /> Secteur d'activité
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {sectorOptions.map((option, index) => (
+                      <OptionCard
+                        key={option.value}
+                        value={option.value}
+                        label={option.label}
+                        description={option.description}
+                        icon={option.icon}
+                        isSelected={sector === option.value}
+                        onClick={() => setSector(option.value)}
+                        index={index}
+                      />
+                    ))}
+                  </div>
+                </div>
 
-              <div>
-                <h3 className="font-semibold text-xs mb-2 flex items-center gap-2">
-                  <MapPin className="w-3 h-3" /> Siège social
-                </h3>
-                <div className="grid grid-cols-4 gap-1">
-                  {locationOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setLocation(option.value)}
-                      className={cn(
-                        "flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all",
-                        location === option.value ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <MapPin className={cn("w-3 h-3", location === option.value ? "text-primary" : "text-muted-foreground")} />
-                      <span className="font-semibold text-xs">{option.label}</span>
-                    </button>
-                  ))}
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="w-4 h-4" /> Siège social
+                  </h3>
+                  <div className="grid grid-cols-4 gap-2">
+                    {locationOptions.map((option, index) => (
+                      <motion.button
+                        key={option.value}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.03 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setLocation(option.value)}
+                        className={cn(
+                          "flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all",
+                          location === option.value
+                            ? "border-primary bg-primary/10 shadow-lg shadow-primary/20"
+                            : "border-border/50 bg-card/30 hover:border-primary/40"
+                        )}
+                      >
+                        <MapPin className={cn(
+                          "w-4 h-4",
+                          location === option.value ? "text-primary" : "text-muted-foreground"
+                        )} />
+                        <span className={cn(
+                          "font-medium text-xs",
+                          location === option.value ? "text-primary" : "text-foreground"
+                        )}>{option.label}</span>
+                      </motion.button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* Step 7: Starting Bonus & Objective */}
           {step === 7 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Avantages & Objectif</h2>
-              </div>
+            <>
+              <StepHeader icon={Gift} title="Avantages & Objectif" subtitle="Configurez votre départ" step={step} totalSteps={TOTAL_STEPS} />
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                      <Gift className="w-4 h-4" /> Bonus de départ
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {startingBonusOptions.map((option, index) => (
+                        <OptionCard
+                          key={option.value}
+                          value={option.value}
+                          label={option.label}
+                          description={option.description}
+                          bonus={option.effect}
+                          icon={option.icon}
+                          isSelected={startingBonus === option.value}
+                          onClick={() => setStartingBonus(option.value)}
+                          index={index}
+                          showConfetti
+                        />
+                      ))}
+                    </div>
+                  </div>
 
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Gift className="w-3 h-3 inline mr-1" />Bonus de départ</h3>
-                {renderOptionGrid(startingBonusOptions, startingBonus, (v) => setStartingBonus(v as StartingBonus))}
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Target className="w-3 h-3 inline mr-1" />Objectif</h3>
-                {renderOptionGrid(objectiveOptions, objective, (v) => setObjective(v as GameObjective))}
-              </div>
-            </div>
+                  <div>
+                    <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                      <Target className="w-4 h-4" /> Objectif
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {objectiveOptions.map((option, index) => (
+                        <OptionCard
+                          key={option.value}
+                          value={option.value}
+                          label={option.label}
+                          description={option.description}
+                          bonus={option.target}
+                          icon={option.icon}
+                          isSelected={objective === option.value}
+                          onClick={() => setObjective(option.value)}
+                          index={index}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </ScrollArea>
+            </>
           )}
 
           {/* Step 8: Management Style */}
           {step === 8 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Style de Management</h2>
-                <p className="text-xs text-muted-foreground">Comment allez-vous diriger votre équipe ?</p>
-              </div>
-              {renderAdvancedOptionGrid(MANAGEMENT_STYLES, managementStyle, setManagementStyle, Users)}
-            </div>
+            <>
+              <StepHeader icon={Users} title="Style de Management" subtitle="Comment allez-vous diriger votre équipe ?" step={step} totalSteps={TOTAL_STEPS} />
+              {renderAdvancedOptions(MANAGEMENT_STYLES, managementStyle, setManagementStyle, Users)}
+            </>
           )}
 
           {/* Step 9: Company Culture */}
           {step === 9 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Culture d'Entreprise</h2>
-                <p className="text-xs text-muted-foreground">Quelle ambiance voulez-vous créer ?</p>
-              </div>
-              {renderAdvancedOptionGrid(CULTURE_TYPES, cultureType, setCultureType, Heart)}
-            </div>
+            <>
+              <StepHeader icon={Heart} title="Culture d'Entreprise" subtitle="Quelle ambiance voulez-vous créer ?" step={step} totalSteps={TOTAL_STEPS} />
+              {renderAdvancedOptions(CULTURE_TYPES, cultureType, setCultureType, Heart)}
+            </>
           )}
 
           {/* Step 10: HR Policy */}
           {step === 10 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Politique RH</h2>
-                <p className="text-xs text-muted-foreground">Comment attirer et retenir les talents ?</p>
-              </div>
-              {renderAdvancedOptionGrid(HR_POLICIES, hrPolicy, setHrPolicy, UserCheck)}
-            </div>
+            <>
+              <StepHeader icon={UserCheck} title="Politique RH" subtitle="Comment attirer et retenir les talents ?" step={step} totalSteps={TOTAL_STEPS} />
+              {renderAdvancedOptions(HR_POLICIES, hrPolicy, setHrPolicy, UserCheck)}
+            </>
           )}
 
           {/* Step 11: Marketing Strategy */}
           {step === 11 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Stratégie Marketing</h2>
-                <p className="text-xs text-muted-foreground">Comment allez-vous vous faire connaître ?</p>
-              </div>
-              {renderAdvancedOptionGrid(MARKETING_STRATEGIES, marketingStrategy, setMarketingStrategy, Megaphone)}
-            </div>
+            <>
+              <StepHeader icon={Megaphone} title="Stratégie Marketing" subtitle="Comment allez-vous vous faire connaître ?" step={step} totalSteps={TOTAL_STEPS} />
+              {renderAdvancedOptions(MARKETING_STRATEGIES, marketingStrategy, setMarketingStrategy, Megaphone)}
+            </>
           )}
 
           {/* Step 12: Sales Strategy */}
           {step === 12 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Stratégie Commerciale</h2>
-                <p className="text-xs text-muted-foreground">Comment allez-vous vendre ?</p>
-              </div>
-              {renderAdvancedOptionGrid(SALES_STRATEGIES, salesStrategy, setSalesStrategy, ShoppingCart)}
-            </div>
+            <>
+              <StepHeader icon={ShoppingCart} title="Stratégie Commerciale" subtitle="Comment allez-vous vendre ?" step={step} totalSteps={TOTAL_STEPS} />
+              {renderAdvancedOptions(SALES_STRATEGIES, salesStrategy, setSalesStrategy, ShoppingCart)}
+            </>
           )}
 
           {/* Step 13: Tech & Remote */}
           {step === 13 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Technologie & Télétravail</h2>
+            <>
+              <StepHeader icon={Laptop} title="Technologie & Télétravail" subtitle="Configurez votre environnement de travail" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Laptop className="w-4 h-4" /> Stack Technologique
+                  </h3>
+                  {renderAdvancedOptions(TECH_STACKS, techStack, setTechStack, Laptop)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Wifi className="w-4 h-4" /> Politique Télétravail
+                  </h3>
+                  {renderAdvancedOptions(REMOTE_POLICIES, remotePolicy, setRemotePolicy, Wifi)}
+                </div>
               </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Laptop className="w-3 h-3 inline mr-1" />Stack Technologique</h3>
-                {renderAdvancedOptionGrid(TECH_STACKS, techStack, setTechStack, Laptop)}
-              </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Wifi className="w-3 h-3 inline mr-1" />Politique Télétravail</h3>
-                {renderAdvancedOptionGrid(REMOTE_POLICIES, remotePolicy, setRemotePolicy, Wifi)}
-              </div>
-            </div>
+            </>
           )}
 
           {/* Step 14: Quality & Environment */}
           {step === 14 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Qualité & Environnement</h2>
+            <>
+              <StepHeader icon={Award} title="Qualité & Environnement" subtitle="Définissez vos standards" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Award className="w-4 h-4" /> Politique Qualité
+                  </h3>
+                  {renderAdvancedOptions(QUALITY_POLICIES, qualityPolicy, setQualityPolicy, Award)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Leaf className="w-4 h-4" /> Politique Environnementale
+                  </h3>
+                  {renderAdvancedOptions(ENVIRONMENTAL_POLICIES, environmentalPolicy, setEnvironmentalPolicy, Leaf)}
+                </div>
               </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Award className="w-3 h-3 inline mr-1" />Politique Qualité</h3>
-                {renderAdvancedOptionGrid(QUALITY_POLICIES, qualityPolicy, setQualityPolicy, Award)}
-              </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Leaf className="w-3 h-3 inline mr-1" />Politique Environnementale</h3>
-                {renderAdvancedOptionGrid(ENVIRONMENTAL_POLICIES, environmentalPolicy, setEnvironmentalPolicy, Leaf)}
-              </div>
-            </div>
+            </>
           )}
 
           {/* Step 15: Innovation & Organization */}
           {step === 15 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Innovation & Organisation</h2>
+            <>
+              <StepHeader icon={Brain} title="Innovation & Organisation" subtitle="Structurez votre entreprise" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Brain className="w-4 h-4" /> Stratégie d'Innovation
+                  </h3>
+                  {renderAdvancedOptions(INNOVATION_STRATEGIES, innovationStrategy, setInnovationStrategy, Brain)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Network className="w-4 h-4" /> Structure Organisationnelle
+                  </h3>
+                  {renderAdvancedOptions(ORG_STRUCTURES, orgStructure, setOrgStructure, Network)}
+                </div>
               </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Brain className="w-3 h-3 inline mr-1" />Stratégie d'Innovation</h3>
-                {renderAdvancedOptionGrid(INNOVATION_STRATEGIES, innovationStrategy, setInnovationStrategy, Brain)}
-              </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Network className="w-3 h-3 inline mr-1" />Structure Organisationnelle</h3>
-                {renderAdvancedOptionGrid(ORG_STRUCTURES, orgStructure, setOrgStructure, Network)}
-              </div>
-            </div>
+            </>
           )}
 
           {/* Step 16: Salary & Pricing */}
           {step === 16 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Salaires & Pricing</h2>
+            <>
+              <StepHeader icon={DollarSign} title="Salaires & Pricing" subtitle="Définissez votre politique financière" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <DollarSign className="w-4 h-4" /> Politique Salariale
+                  </h3>
+                  {renderAdvancedOptions(SALARY_POLICIES, salaryPolicy, setSalaryPolicy, DollarSign)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Tag className="w-4 h-4" /> Positionnement Prix
+                  </h3>
+                  {renderAdvancedOptions(PRICING_POSITIONS, pricingPosition, setPricingPosition, Tag)}
+                </div>
               </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><DollarSign className="w-3 h-3 inline mr-1" />Politique Salariale</h3>
-                {renderAdvancedOptionGrid(SALARY_POLICIES, salaryPolicy, setSalaryPolicy, DollarSign)}
-              </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Tag className="w-3 h-3 inline mr-1" />Positionnement Prix</h3>
-                {renderAdvancedOptionGrid(PRICING_POSITIONS, pricingPosition, setPricingPosition, Tag)}
-              </div>
-            </div>
+            </>
           )}
 
           {/* Step 17: International & Funding */}
           {step === 17 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">International & Financement</h2>
+            <>
+              <StepHeader icon={Earth} title="International & Financement" subtitle="Planifiez votre croissance" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Earth className="w-4 h-4" /> Ambition Internationale
+                  </h3>
+                  {renderAdvancedOptions(INTERNATIONAL_AMBITIONS, internationalAmbition, setInternationalAmbition, Earth)}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+                    <Banknote className="w-4 h-4" /> Mode de Financement
+                  </h3>
+                  {renderAdvancedOptions(FUNDING_MODES, fundingMode, setFundingMode, Banknote)}
+                </div>
               </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Earth className="w-3 h-3 inline mr-1" />Ambition Internationale</h3>
-                {renderAdvancedOptionGrid(INTERNATIONAL_AMBITIONS, internationalAmbition, setInternationalAmbition, Earth)}
-              </div>
-              
-              <div>
-                <h3 className="font-semibold text-xs mb-2"><Banknote className="w-3 h-3 inline mr-1" />Mode de Financement</h3>
-                {renderAdvancedOptionGrid(FUNDING_MODES, fundingMode, setFundingMode, Banknote)}
-              </div>
-            </div>
+            </>
           )}
 
           {/* Step 18: Capital & Summary */}
           {step === 18 && (
-            <div className="space-y-4">
-              <div className="text-center">
-                <h2 className="text-lg font-display font-semibold mb-1">Capital & Récapitulatif</h2>
-              </div>
+            <>
+              <StepHeader icon={Coins} title="Capital & Récapitulatif" subtitle="Finalisez votre entreprise" step={step} totalSteps={TOTAL_STEPS} />
+              <div className="space-y-6">
+                {/* Capital slider */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gradient-to-br from-primary/10 to-transparent rounded-2xl p-6 border-2 border-primary/20"
+                >
+                  <div className="text-center mb-4">
+                    <motion.span
+                      key={capital}
+                      initial={{ scale: 1.2, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="text-4xl font-display font-bold text-primary"
+                    >
+                      {formatCurrency(capital + (startingBonus === 'extra_cash' ? 50000 : 0))}
+                    </motion.span>
+                    {startingBonus === 'extra_cash' && (
+                      <p className="text-sm text-success mt-2">+50 000€ bonus héritage inclus</p>
+                    )}
+                  </div>
+                  <input
+                    type="range"
+                    min="5000"
+                    max="100000"
+                    step="5000"
+                    value={capital}
+                    onChange={(e) => setCapital(Number(e.target.value))}
+                    className="w-full accent-primary h-2 rounded-full appearance-none bg-muted cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                    <span>5 000€</span>
+                    <span>100 000€</span>
+                  </div>
+                </motion.div>
 
-              <div className="space-y-3">
-                <div className="text-center">
-                  <span className="text-3xl font-display font-bold text-primary">
-                    {formatCurrency(capital + (startingBonus === 'extra_cash' ? 50000 : 0))}
-                  </span>
-                  {startingBonus === 'extra_cash' && (
-                    <p className="text-xs text-success mt-1">+50 000€ bonus héritage inclus</p>
-                  )}
-                </div>
-                <input
-                  type="range"
-                  min="5000"
-                  max="100000"
-                  step="5000"
-                  value={capital}
-                  onChange={(e) => setCapital(Number(e.target.value))}
-                  className="w-full accent-primary"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>5 000€</span>
-                  <span>100 000€</span>
-                </div>
+                {/* Summary */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-border/50"
+                >
+                  <h3 className="font-display font-semibold text-sm mb-4 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-primary" />
+                    Récapitulatif
+                  </h3>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                    {[
+                      { label: "Entreprise", value: companyName || '-' },
+                      { label: "Difficulté", value: difficultyOptions.find(o => o.value === difficulty)?.label },
+                      { label: "Mode", value: gameModeOptions.find(o => o.value === gameMode)?.label },
+                      { label: "Fondateur", value: founderOptions.find(o => o.value === founderType)?.label },
+                      { label: "Secteur", value: sector ? sectorOptions.find(o => o.value === sector)?.label : '-' },
+                      { label: "Siège", value: locationOptions.find(o => o.value === location)?.label },
+                      { label: "Management", value: MANAGEMENT_STYLES[managementStyle]?.label },
+                      { label: "Culture", value: CULTURE_TYPES[cultureType]?.label },
+                      { label: "Télétravail", value: REMOTE_POLICIES[remotePolicy]?.label },
+                      { label: "International", value: INTERNATIONAL_AMBITIONS[internationalAmbition]?.label },
+                    ].map((item, index) => (
+                      <motion.div
+                        key={item.label}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        className="flex justify-between py-1 border-b border-border/30"
+                      >
+                        <span className="text-muted-foreground">{item.label}</span>
+                        <span className="font-medium text-foreground truncate ml-2">{item.value}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
               </div>
-
-              {/* Summary */}
-              <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
-                <h3 className="font-display font-semibold text-xs mb-2">Récapitulatif</h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Entreprise</span>
-                    <span className="font-medium truncate ml-2">{companyName || '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Difficulté</span>
-                    <span className="font-medium">{difficultyOptions.find(o => o.value === difficulty)?.label}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Mode</span>
-                    <span className="font-medium">{gameModeOptions.find(o => o.value === gameMode)?.label}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Fondateur</span>
-                    <span className="font-medium">{founderOptions.find(o => o.value === founderType)?.label}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Secteur</span>
-                    <span className="font-medium">{sector ? sectorOptions.find(o => o.value === sector)?.label : '-'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Siège</span>
-                    <span className="font-medium">{locationOptions.find(o => o.value === location)?.label}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Management</span>
-                    <span className="font-medium">{MANAGEMENT_STYLES[managementStyle]?.label}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Culture</span>
-                    <span className="font-medium">{CULTURE_TYPES[cultureType]?.label}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Télétravail</span>
-                    <span className="font-medium">{REMOTE_POLICIES[remotePolicy]?.label}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">International</span>
-                    <span className="font-medium">{INTERNATIONAL_AMBITIONS[internationalAmbition]?.label}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </>
           )}
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
+
+  return (
+    <div className="min-h-screen relative flex items-center justify-center p-4">
+      <SetupBackground />
+      
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="w-full max-w-3xl"
+      >
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-4xl font-display font-bold text-foreground mb-2">
+            Simu'<span className="text-primary text-glow">Entrepreneur</span>
+          </h1>
+          <p className="text-muted-foreground">Le Défi Citoyen</p>
+        </motion.div>
+
+        {/* Main Card */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="relative bg-card/40 backdrop-blur-xl border-2 border-border/50 rounded-3xl p-6 shadow-2xl shadow-black/20 overflow-hidden"
+        >
+          {/* Gradient overlay on card */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+          
+          {/* Step indicator */}
+          <StepIndicator
+            currentStep={step}
+            totalSteps={TOTAL_STEPS}
+            onStepClick={(s) => setStep(s)}
+          />
+
+          {/* Content */}
+          <ScrollArea className="h-[55vh] pr-4">
+            <div className="relative z-10 pb-4">
+              {renderStepContent()}
             </div>
           </ScrollArea>
 
-          {/* Navigation Buttons - Fixed at bottom */}
-          <div className="flex gap-3 pt-4 border-t border-border mt-4">
-            {step > 1 && (
-              <button onClick={() => setStep(step - 1)} className="flex-1 btn-game-secondary">
-                Retour
-              </button>
-            )}
-            {step < TOTAL_STEPS ? (
-              <button
-                onClick={() => {
-                  if (step === 3 && !companyName.trim()) return;
-                  if (step === 5 && !selectedLegalStructure) return;
-                  if (step === 6 && !sector) return;
-                  setStep(step + 1);
-                }}
-                disabled={(step === 3 && !companyName.trim()) || (step === 5 && !selectedLegalStructure) || (step === 6 && !sector)}
-                className="flex-1 btn-game-primary disabled:opacity-50"
-              >
-                Continuer
-              </button>
-            ) : (
-              <button onClick={handleComplete} className="flex-1 btn-game-primary">
-                <Rocket className="w-4 h-4 mr-2 inline" />
-                Lancer l'entreprise !
-              </button>
-            )}
+          {/* Navigation */}
+          <div className="relative z-10 border-t border-border/50 mt-4 pt-2">
+            <NavigationButtons
+              step={step}
+              totalSteps={TOTAL_STEPS}
+              onPrev={() => setStep(step - 1)}
+              onNext={() => canProgress() && setStep(step + 1)}
+              onComplete={handleComplete}
+              canProgress={canProgress()}
+            />
           </div>
-        </div>
+        </motion.div>
 
-        <p className="text-center text-xs text-muted-foreground mt-4">
+        {/* Footer */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="text-center text-xs text-muted-foreground mt-6"
+        >
           Simulation basée sur le système fiscal français 2024 • 18 étapes • 300+ options
-        </p>
-      </div>
+        </motion.p>
+      </motion.div>
     </div>
   );
 }
