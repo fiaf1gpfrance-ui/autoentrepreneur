@@ -401,7 +401,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
         <div className="game-panel max-h-[75vh] overflow-hidden flex flex-col">
           {renderStepIndicator()}
           
-          <ScrollArea className="flex-1 pr-2">
+          <ScrollArea className="flex-1 min-h-0 pr-2">
             <div className="space-y-4 pb-4">
 
           {/* Step 1: Difficulty */}

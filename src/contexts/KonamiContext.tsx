@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
 
@@ -9,7 +9,7 @@ interface KonamiContextType {
 
 const KonamiContext = createContext<KonamiContextType | null>(null);
 
-const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'KeyB', 'KeyA'];
+const KONAMI_CODE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
 // Fonction pour lancer les confettis dorés
 const launchGoldenConfetti = () => {
@@ -55,31 +55,35 @@ export function KonamiProvider({ children }: { children: ReactNode }) {
   const [konamiActive, setKonamiActive] = useState(false);
   const konamiSequenceRef = useRef<string[]>([]);
 
-  const activateKonami = () => {
+  const activateKonami = useCallback(() => {
     if (!konamiActive) {
       setKonamiActive(true);
       toast.success('🎮 KONAMI CODE ACTIVÉ ! Mode protégé : crédibilité boostée, faillite impossible !', { duration: 5000 });
       launchGoldenConfetti();
     }
-  };
+  }, [konamiActive]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Use e.key for layout-independent letters (AZERTY/QWERTY) + arrows
+      const key = e.key.startsWith('Arrow') ? e.key : e.key.toLowerCase();
+
       // Add key to sequence and keep only last 10
-      konamiSequenceRef.current = [...konamiSequenceRef.current, e.code].slice(-10);
-      
+      konamiSequenceRef.current = [...konamiSequenceRef.current, key].slice(-KONAMI_CODE.length);
+
       // Check if konami code matches
-      if (konamiSequenceRef.current.length === 10) {
-        const matches = konamiSequenceRef.current.every((key, i) => key === KONAMI_CODE[i]);
-        if (matches && !konamiActive) {
-          activateKonami();
-        }
+      if (!konamiActive) {
+        const matches = konamiSequenceRef.current.length === KONAMI_CODE.length &&
+          konamiSequenceRef.current.every((k, i) => k === KONAMI_CODE[i]);
+
+        if (matches) activateKonami();
       }
     };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [konamiActive]);
+
+    // capture=true so it still works even when an input is focused
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [konamiActive, activateKonami]);
 
   return (
     <KonamiContext.Provider value={{ konamiActive, activateKonami }}>
