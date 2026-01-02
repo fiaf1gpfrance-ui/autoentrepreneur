@@ -88,6 +88,7 @@ import { GameSave } from "@/hooks/useGameSave";
 import { GameSettings } from "./CompanySetup";
 import { InvestorsPanel } from "./InvestorsPanel";
 import { CompetitionPanel } from "./CompetitionPanel";
+import { AdvancedCompetitionPanel } from "./AdvancedCompetitionPanel";
 import { RichEventsPanel } from "./RichEventsPanel";
 import { TradingPanel } from "./TradingPanel";
 import { VehicleFleetPanel } from "./VehicleFleetPanel";
@@ -159,7 +160,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'richevents' | 'trading' | 'vehicles';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'advancedcompetition' | 'richevents' | 'trading' | 'vehicles';
 
 interface OpenWindow {
   id: TabId;
@@ -1191,6 +1192,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'vehicles', label: 'Véhicules', icon: Car },
     { id: 'investors', label: 'Investisseurs', icon: PieChart },
     { id: 'competition', label: 'Concurrence', icon: Swords },
+    { id: 'advancedcompetition', label: 'Compétition IA', icon: Brain },
     { id: 'richevents', label: 'Événements', icon: Eye },
     { id: 'marketing', label: 'Marketing', icon: Megaphone },
     { id: 'technology', label: 'R&D', icon: Cpu },
