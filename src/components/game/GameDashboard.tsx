@@ -92,6 +92,7 @@ import { AdvancedCompetitionPanel } from "./AdvancedCompetitionPanel";
 import { RichEventsPanel } from "./RichEventsPanel";
 import { TradingPanel } from "./TradingPanel";
 import { VehicleFleetPanel } from "./VehicleFleetPanel";
+import { SkillTreePanel } from "./SkillTreePanel";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   calculateDailyCoinGain, 
@@ -161,7 +162,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'advancedcompetition' | 'richevents' | 'trading' | 'vehicles';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'advancedcompetition' | 'richevents' | 'trading' | 'vehicles' | 'skilltree';
 
 interface OpenWindow {
   id: TabId;
@@ -1188,6 +1189,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'overview', label: 'Aperçu', icon: TrendingUp },
     { id: 'shop', label: 'Boutique', icon: ShoppingCart },
     { id: 'progression', label: 'Progression', icon: Star },
+    { id: 'skilltree', label: 'Compétences', icon: Brain },
     { id: 'achievements', label: 'Trophées', icon: Trophy },
     { id: 'trading', label: 'Trading', icon: LineChart },
     { id: 'vehicles', label: 'Véhicules', icon: Car },
@@ -1428,6 +1430,10 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
           onTreasuryChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + amount } }))}
           onReputationChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, credibility: Math.min(100, Math.max(konamiActive ? 1 : 0, prev.company!.credibility + amount)) } }))}
           onProductivityChange={(amount) => toast.info(`Productivité ${amount >= 0 ? '+' : ''}${amount}%`)}
+        />;
+      case 'skilltree':
+        return <SkillTreePanel 
+          onSkillPointsChange={(points) => toast.info(`Points de compétence: ${points}`)}
         />;
       default:
         return <DesktopOverview company={company} gameState={gameState} onDismissEvent={dismissEvent} />;
