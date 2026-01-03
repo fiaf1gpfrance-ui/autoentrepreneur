@@ -93,6 +93,8 @@ import { RichEventsPanel } from "./RichEventsPanel";
 import { TradingPanel } from "./TradingPanel";
 import { VehicleFleetPanel } from "./VehicleFleetPanel";
 import { SkillTreePanel } from "./SkillTreePanel";
+import { ReputationPanel } from "./ReputationPanel";
+import { InsurancePanel } from "./InsurancePanel";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   calculateDailyCoinGain, 
@@ -162,7 +164,7 @@ const weatherConfig = {
   crise: { icon: CloudLightning, label: "Crise", color: "text-destructive" },
 };
 
-type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'advancedcompetition' | 'richevents' | 'trading' | 'vehicles' | 'skilltree';
+type TabId = 'overview' | 'rh' | 'products' | 'taxes' | 'banking' | 'realestate' | 'supply' | 'hradvanced' | 'legal' | 'gameplay' | 'international' | 'achievements' | 'marketing' | 'technology' | 'crises' | 'shop' | 'progression' | 'advancedinternational' | 'ultrafinance' | 'advancedproduction' | 'advancedcommercial' | 'salespipeline' | 'investors' | 'competition' | 'advancedcompetition' | 'richevents' | 'trading' | 'vehicles' | 'skilltree' | 'reputation' | 'insurance';
 
 interface OpenWindow {
   id: TabId;
@@ -1213,6 +1215,8 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     { id: 'international', label: 'International', icon: Globe },
     { id: 'advancedinternational', label: 'Mondial', icon: Map },
     { id: 'legal', label: 'Juridique', icon: Scale },
+    { id: 'reputation', label: 'Réputation', icon: Heart },
+    { id: 'insurance', label: 'Assurances', icon: Shield },
     { id: 'taxes', label: 'Fiscalité', icon: FileText },
     { id: 'gameplay', label: 'Stats', icon: BarChart3 },
   ];
@@ -1243,6 +1247,8 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
       international: "text-blue-500",
       advancedinternational: "text-indigo-500",
       legal: "text-slate-400",
+      reputation: "text-pink-500",
+      insurance: "text-teal-500",
       taxes: "text-gray-400",
       gameplay: "text-zinc-400",
       trading: "text-emerald-500",
@@ -1434,6 +1440,22 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
       case 'skilltree':
         return <SkillTreePanel 
           onSkillPointsChange={(points) => toast.info(`Points de compétence: ${points}`)}
+        />;
+      case 'reputation':
+        return <ReputationPanel 
+          day={gameState.day}
+          treasury={company.treasury}
+          onTreasuryChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + amount } }))}
+        />;
+      case 'insurance':
+        return <InsurancePanel 
+          day={gameState.day}
+          treasury={company.treasury}
+          employeeCount={company.employees.length}
+          reputationScore={company.reputation}
+          hasInternational={company.foreignMarkets?.length > 0}
+          hasProducts={company.products?.length > 0}
+          onTreasuryChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + amount } }))}
         />;
       default:
         return <DesktopOverview company={company} gameState={gameState} onDismissEvent={dismissEvent} />;
