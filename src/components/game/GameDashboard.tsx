@@ -144,6 +144,7 @@ import {
   Handshake,
   Car,
   LineChart,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -1407,6 +1408,17 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
           treasury={company.treasury} 
           day={gameState.day} 
           onTreasuryChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + amount } }))} 
+        />;
+      case 'advancedcompetition':
+        return <AdvancedCompetitionPanel 
+          company={company}
+          gameState={gameState}
+          onTreasuryChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, treasury: prev.company!.treasury + amount } }))}
+          onReputationChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, credibility: Math.min(100, Math.max(0, prev.company!.credibility + amount)) } }))}
+          onMarketShareChange={(amount) => setGameState(prev => ({ ...prev, company: { ...prev.company!, marketShare: Math.min(100, Math.max(0, prev.company!.marketShare + amount)) } }))}
+          onCompetitorUpdate={(competitors) => toast.info("Concurrents mis à jour")}
+          onAllianceUpdate={(alliances) => toast.info("Alliances mises à jour")}
+          onSpyAgentUpdate={(agents) => toast.info("Agents mis à jour")}
         />;
       case 'vehicles':
         return <VehicleFleetPanel 
