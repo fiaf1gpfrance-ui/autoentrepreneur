@@ -95,6 +95,7 @@ import { VehicleFleetPanel } from "./VehicleFleetPanel";
 import { SkillTreePanel } from "./SkillTreePanel";
 import { ReputationPanel } from "./ReputationPanel";
 import { InsurancePanel } from "./InsurancePanel";
+import { WorldCity, WORLD_CITIES } from "@/data/worldCities";
 import { enterMarket, createSubsidiary } from "@/utils/internationalEngine";
 import { 
   calculateDailyCoinGain, 
@@ -212,7 +213,7 @@ export function GameDashboard({ initialState, onReset }: GameDashboardProps) {
     difficulty: 'normal',
     gameMode: 'career',
     founderType: 'visionary',
-    location: 'paris',
+    location: WORLD_CITIES.find(c => c.id === 'paris')!,
     startingBonus: 'none',
     objective: 'millionaire',
     legalStructure: 'sas'
