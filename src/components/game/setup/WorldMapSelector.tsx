@@ -1,13 +1,16 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { 
   Search, MapPin, Building2, TrendingUp, Globe, Zap, 
-  Factory, Ship, Landmark, ChevronDown, X, Filter, Star
+  Factory, Ship, Landmark, X, Filter, Star, Key, ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   WorldCity, 
   WORLD_CITIES, 
@@ -31,6 +34,14 @@ const CONTINENT_COLORS: Record<string, string> = {
   "Africa": "bg-orange-500/20 text-orange-400 border-orange-500/30",
 };
 
+// Mapbox token from localStorage or empty
+const getStoredToken = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('mapbox_token') || '';
+  }
+  return '';
+};
+
 export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeContinent, setActiveContinent] = useState<string | null>(null);
@@ -43,7 +54,14 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
     capital: false,
   });
   const [hoveredCity, setHoveredCity] = useState<WorldCity | null>(null);
-  const mapRef = useRef<HTMLDivElement>(null);
+  
+  // Mapbox state
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const [mapboxToken, setMapboxToken] = useState(getStoredToken());
+  const [showTokenInput, setShowTokenInput] = useState(!getStoredToken());
+  const [mapReady, setMapReady] = useState(false);
 
   // Fuse.js for fuzzy search
   const fuse = useMemo(() => new Fuse(WORLD_CITIES, {
@@ -56,18 +74,15 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
   const filteredCities = useMemo(() => {
     let cities = WORLD_CITIES;
 
-    // Apply search
     if (searchQuery.trim()) {
       const results = fuse.search(searchQuery);
       cities = results.map(r => r.item);
     }
 
-    // Apply continent filter
     if (activeContinent) {
       cities = cities.filter(c => c.continent === activeContinent);
     }
 
-    // Apply feature filters
     const activeFilters = Object.entries(filters).filter(([_, active]) => active);
     if (activeFilters.length > 0) {
       cities = cities.filter(city => 
@@ -78,7 +93,7 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
     return cities;
   }, [searchQuery, activeContinent, filters, fuse]);
 
-  // Group cities by continent for display
+  // Group cities by continent
   const citiesByContinent = useMemo(() => {
     const grouped: Record<string, WorldCity[]> = {};
     CONTINENTS.forEach(continent => {
@@ -90,17 +105,120 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
     return grouped;
   }, [filteredCities]);
 
-  // Top cities for quick selection
   const topCities = useMemo(() => getTopCitiesByEconomicIndex(12), []);
 
-  // Convert lat/lng to map position (simplified mercator projection)
-  const getMapPosition = (city: WorldCity) => {
-    const x = ((city.lng + 180) / 360) * 100;
-    const latRad = city.lat * Math.PI / 180;
-    const mercN = Math.log(Math.tan((Math.PI / 4) + (latRad / 2)));
-    const y = (50 - (mercN * 100 / Math.PI / 2));
-    return { x: Math.max(2, Math.min(98, x)), y: Math.max(5, Math.min(85, y)) };
-  };
+  // Initialize Mapbox map
+  useEffect(() => {
+    if (!mapContainer.current || !mapboxToken || map.current) return;
+
+    try {
+      mapboxgl.accessToken = mapboxToken;
+      
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/dark-v11',
+        center: [10, 30],
+        zoom: 1.5,
+        projection: 'globe',
+        attributionControl: false,
+      });
+
+      map.current.addControl(
+        new mapboxgl.NavigationControl({ visualizePitch: true }),
+        'top-right'
+      );
+
+      map.current.on('style.load', () => {
+        map.current?.setFog({
+          color: 'rgb(20, 20, 30)',
+          'high-color': 'rgb(40, 40, 60)',
+          'horizon-blend': 0.1,
+          'star-intensity': 0.15,
+        });
+        setMapReady(true);
+      });
+
+      // Save token to localStorage
+      localStorage.setItem('mapbox_token', mapboxToken);
+
+    } catch (error) {
+      console.error('Error initializing map:', error);
+      setShowTokenInput(true);
+    }
+
+    return () => {
+      markersRef.current.forEach(marker => marker.remove());
+      map.current?.remove();
+      map.current = null;
+      setMapReady(false);
+    };
+  }, [mapboxToken]);
+
+  // Update markers when filtered cities or selection changes
+  useEffect(() => {
+    if (!map.current || !mapReady) return;
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
+
+    // Add markers for filtered cities
+    filteredCities.forEach(city => {
+      const isSelected = selectedCity?.id === city.id;
+      
+      // Create marker element
+      const el = document.createElement('div');
+      el.className = 'city-marker';
+      el.style.cssText = `
+        width: ${isSelected ? '24px' : '14px'};
+        height: ${isSelected ? '24px' : '14px'};
+        background: ${isSelected ? 'hsl(var(--primary))' : 'rgba(255, 255, 255, 0.7)'};
+        border: 2px solid ${isSelected ? 'white' : 'rgba(255, 255, 255, 0.3)'};
+        border-radius: 50%;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: ${isSelected ? '0 0 20px hsl(var(--primary)), 0 0 40px hsl(var(--primary) / 0.5)' : '0 2px 8px rgba(0,0,0,0.3)'};
+      `;
+      
+      el.addEventListener('mouseenter', () => {
+        if (!isSelected) {
+          el.style.transform = 'scale(1.5)';
+          el.style.background = 'hsl(var(--primary))';
+        }
+        setHoveredCity(city);
+      });
+      
+      el.addEventListener('mouseleave', () => {
+        if (!isSelected) {
+          el.style.transform = 'scale(1)';
+          el.style.background = 'rgba(255, 255, 255, 0.7)';
+        }
+        setHoveredCity(null);
+      });
+      
+      el.addEventListener('click', () => {
+        onSelectCity(city);
+      });
+
+      const marker = new mapboxgl.Marker({ element: el })
+        .setLngLat([city.lng, city.lat])
+        .addTo(map.current!);
+
+      markersRef.current.push(marker);
+    });
+  }, [filteredCities, selectedCity, mapReady, onSelectCity]);
+
+  // Fly to selected city
+  useEffect(() => {
+    if (!map.current || !selectedCity || !mapReady) return;
+    
+    map.current.flyTo({
+      center: [selectedCity.lng, selectedCity.lat],
+      zoom: 5,
+      duration: 1500,
+      essential: true,
+    });
+  }, [selectedCity, mapReady]);
 
   const toggleFilter = (key: keyof typeof filters) => {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }));
@@ -119,6 +237,15 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
   };
 
   const hasActiveFilters = Object.values(filters).some(Boolean) || activeContinent;
+
+  const handleTokenSubmit = () => {
+    if (mapboxToken.trim()) {
+      localStorage.setItem('mapbox_token', mapboxToken.trim());
+      setShowTokenInput(false);
+      // Force re-render to initialize map
+      window.location.reload();
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -229,70 +356,73 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
         )}
       </AnimatePresence>
 
+      {/* Mapbox Token Input */}
+      {showTokenInput && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30"
+        >
+          <div className="flex items-start gap-3">
+            <Key className="w-5 h-5 text-amber-500 mt-0.5" />
+            <div className="flex-1 space-y-3">
+              <div>
+                <h4 className="font-semibold text-amber-200">Token Mapbox requis</h4>
+                <p className="text-xs text-amber-300/80 mt-1">
+                  Pour afficher la carte mondiale interactive, entrez votre token Mapbox public.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={mapboxToken}
+                  onChange={(e) => setMapboxToken(e.target.value)}
+                  placeholder="pk.eyJ1IjoieW91..."
+                  className="bg-card/50 border-amber-500/30 text-sm"
+                />
+                <Button 
+                  onClick={handleTokenSubmit}
+                  size="sm"
+                  className="bg-amber-500 hover:bg-amber-600 text-black"
+                >
+                  Activer
+                </Button>
+              </div>
+              <a 
+                href="https://account.mapbox.com/access-tokens/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Obtenir un token gratuit sur Mapbox
+              </a>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Interactive World Map */}
       <div 
-        ref={mapRef}
-        className="relative w-full h-[200px] rounded-xl bg-gradient-to-b from-slate-900/80 to-slate-800/80 border border-border/50 overflow-hidden"
+        ref={mapContainer}
+        className="relative w-full h-[280px] rounded-xl border border-border/50 overflow-hidden bg-slate-900"
       >
-        {/* Grid lines */}
-        <div className="absolute inset-0 opacity-20">
-          {[0, 20, 40, 60, 80, 100].map(x => (
-            <div key={`v-${x}`} className="absolute top-0 bottom-0 border-l border-white/20" style={{ left: `${x}%` }} />
-          ))}
-          {[0, 25, 50, 75, 100].map(y => (
-            <div key={`h-${y}`} className="absolute left-0 right-0 border-t border-white/20" style={{ top: `${y}%` }} />
-          ))}
-        </div>
-
-        {/* Continent labels */}
-        <div className="absolute inset-0 pointer-events-none">
-          <span className="absolute text-[10px] text-white/30 font-medium" style={{ left: '45%', top: '25%' }}>EUROPE</span>
-          <span className="absolute text-[10px] text-white/30 font-medium" style={{ left: '20%', top: '30%' }}>AMÉRIQUE</span>
-          <span className="absolute text-[10px] text-white/30 font-medium" style={{ left: '70%', top: '35%' }}>ASIE</span>
-          <span className="absolute text-[10px] text-white/30 font-medium" style={{ left: '45%', top: '60%' }}>AFRIQUE</span>
-          <span className="absolute text-[10px] text-white/30 font-medium" style={{ left: '80%', top: '70%' }}>OCÉANIE</span>
-        </div>
-
-        {/* City dots */}
-        {filteredCities.map(city => {
-          const pos = getMapPosition(city);
-          const isSelected = selectedCity?.id === city.id;
-          const isHovered = hoveredCity?.id === city.id;
-          
-          return (
-            <motion.button
-              key={city.id}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              onClick={() => onSelectCity(city)}
-              onMouseEnter={() => setHoveredCity(city)}
-              onMouseLeave={() => setHoveredCity(null)}
-              className={cn(
-                "absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full transition-all z-10",
-                isSelected 
-                  ? "w-4 h-4 bg-primary ring-4 ring-primary/30 z-20" 
-                  : isHovered
-                  ? "w-3 h-3 bg-primary/80 ring-2 ring-primary/20 z-20"
-                  : "w-2 h-2 bg-white/60 hover:bg-white hover:scale-150"
-              )}
-              style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-            />
-          );
-        })}
+        {!mapboxToken && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90">
+            <div className="text-center">
+              <Globe className="w-12 h-12 text-muted-foreground mx-auto mb-2 opacity-50" />
+              <p className="text-sm text-muted-foreground">Entrez votre token Mapbox pour afficher la carte</p>
+            </div>
+          </div>
+        )}
 
         {/* Tooltip for hovered city */}
         <AnimatePresence>
-          {hoveredCity && !selectedCity && (
+          {hoveredCity && (
             <motion.div
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="absolute z-30 pointer-events-none"
-              style={{
-                left: `${Math.min(85, Math.max(15, getMapPosition(hoveredCity).x))}%`,
-                top: `${Math.max(15, getMapPosition(hoveredCity).y - 10)}%`,
-                transform: 'translateX(-50%)'
-              }}
+              className="absolute z-30 pointer-events-none top-4 left-4"
             >
               <div className="bg-popover/95 backdrop-blur border border-border rounded-lg px-3 py-2 shadow-xl">
                 <div className="flex items-center gap-2">
@@ -301,6 +431,10 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
                     <p className="font-semibold text-sm">{hoveredCity.name}</p>
                     <p className="text-xs text-muted-foreground">{hoveredCity.country}</p>
                   </div>
+                  <div className="text-right ml-2">
+                    <p className="text-sm font-bold text-primary">{hoveredCity.economicIndex}</p>
+                    <p className="text-[10px] text-muted-foreground">Éco.</p>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -308,7 +442,7 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
         </AnimatePresence>
 
         {/* Result count */}
-        <div className="absolute bottom-2 right-2 text-xs text-white/50">
+        <div className="absolute bottom-2 right-2 text-xs text-white/50 bg-black/50 px-2 py-1 rounded">
           {filteredCities.length} ville{filteredCities.length > 1 ? 's' : ''}
         </div>
       </div>
@@ -434,7 +568,7 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
       )}
 
       {/* Cities List by Continent */}
-      <ScrollArea className="h-[200px]">
+      <ScrollArea className="h-[180px]">
         <div className="space-y-4 pr-4">
           {Object.entries(citiesByContinent).map(([continent, cities]) => (
             <div key={continent}>
@@ -444,7 +578,7 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
                 <span className="text-xs text-muted-foreground">({cities.length})</span>
               </div>
               <div className="grid grid-cols-2 gap-1.5">
-                {cities.slice(0, 10).map(city => (
+                {cities.slice(0, 8).map(city => (
                   <button
                     key={city.id}
                     onClick={() => onSelectCity(city)}
@@ -466,9 +600,9 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
                   </button>
                 ))}
               </div>
-              {cities.length > 10 && (
+              {cities.length > 8 && (
                 <p className="text-xs text-muted-foreground mt-1 ml-6">
-                  +{cities.length - 10} autres villes
+                  +{cities.length - 8} autres villes
                 </p>
               )}
             </div>
