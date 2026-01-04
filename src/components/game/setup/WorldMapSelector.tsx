@@ -1,16 +1,15 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { 
   Search, MapPin, Building2, TrendingUp, Globe, Zap, 
-  Factory, Ship, Landmark, X, Filter, Star, Key, ExternalLink
+  Factory, Ship, Landmark, X, Filter, Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { 
   WorldCity, 
   WORLD_CITIES, 
@@ -34,12 +33,13 @@ const CONTINENT_COLORS: Record<string, string> = {
   "Africa": "bg-orange-500/20 text-orange-400 border-orange-500/30",
 };
 
-// Mapbox token from localStorage or empty
-const getStoredToken = () => {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('mapbox_token') || '';
-  }
-  return '';
+const CONTINENT_MARKER_COLORS: Record<string, string> = {
+  "Europe": "#3b82f6",
+  "North America": "#22c55e",
+  "South America": "#f59e0b",
+  "Asia": "#ef4444",
+  "Oceania": "#06b6d4",
+  "Africa": "#f97316",
 };
 
 export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelectorProps) {
@@ -55,12 +55,10 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
   });
   const [hoveredCity, setHoveredCity] = useState<WorldCity | null>(null);
   
-  // Mapbox state
+  // Leaflet state
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const markersRef = useRef<mapboxgl.Marker[]>([]);
-  const [mapboxToken, setMapboxToken] = useState(getStoredToken());
-  const [showTokenInput, setShowTokenInput] = useState(!getStoredToken());
+  const map = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.CircleMarker[]>([]);
   const [mapReady, setMapReady] = useState(false);
 
   // Fuse.js for fuzzy search
@@ -107,44 +105,28 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
 
   const topCities = useMemo(() => getTopCitiesByEconomicIndex(12), []);
 
-  // Initialize Mapbox map
+  // Initialize Leaflet map
   useEffect(() => {
-    if (!mapContainer.current || !mapboxToken || map.current) return;
+    if (!mapContainer.current || map.current) return;
 
-    try {
-      mapboxgl.accessToken = mapboxToken;
-      
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/dark-v11',
-        center: [10, 30],
-        zoom: 1.5,
-        projection: 'globe',
-        attributionControl: false,
-      });
+    // Create map with dark theme
+    map.current = L.map(mapContainer.current, {
+      center: [30, 10],
+      zoom: 2,
+      minZoom: 2,
+      maxZoom: 12,
+      worldCopyJump: true,
+      zoomControl: true,
+    });
 
-      map.current.addControl(
-        new mapboxgl.NavigationControl({ visualizePitch: true }),
-        'top-right'
-      );
+    // Add dark tile layer from CartoDB
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map.current);
 
-      map.current.on('style.load', () => {
-        map.current?.setFog({
-          color: 'rgb(20, 20, 30)',
-          'high-color': 'rgb(40, 40, 60)',
-          'horizon-blend': 0.1,
-          'star-intensity': 0.15,
-        });
-        setMapReady(true);
-      });
-
-      // Save token to localStorage
-      localStorage.setItem('mapbox_token', mapboxToken);
-
-    } catch (error) {
-      console.error('Error initializing map:', error);
-      setShowTokenInput(true);
-    }
+    setMapReady(true);
 
     return () => {
       markersRef.current.forEach(marker => marker.remove());
@@ -152,7 +134,7 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
       map.current = null;
       setMapReady(false);
     };
-  }, [mapboxToken]);
+  }, []);
 
   // Update markers when filtered cities or selection changes
   useEffect(() => {
@@ -165,45 +147,53 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
     // Add markers for filtered cities
     filteredCities.forEach(city => {
       const isSelected = selectedCity?.id === city.id;
+      const color = CONTINENT_MARKER_COLORS[city.continent] || '#ffffff';
       
-      // Create marker element
-      const el = document.createElement('div');
-      el.className = 'city-marker';
-      el.style.cssText = `
-        width: ${isSelected ? '24px' : '14px'};
-        height: ${isSelected ? '24px' : '14px'};
-        background: ${isSelected ? 'hsl(var(--primary))' : 'rgba(255, 255, 255, 0.7)'};
-        border: 2px solid ${isSelected ? 'white' : 'rgba(255, 255, 255, 0.3)'};
-        border-radius: 50%;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        box-shadow: ${isSelected ? '0 0 20px hsl(var(--primary)), 0 0 40px hsl(var(--primary) / 0.5)' : '0 2px 8px rgba(0,0,0,0.3)'};
-      `;
-      
-      el.addEventListener('mouseenter', () => {
-        if (!isSelected) {
-          el.style.transform = 'scale(1.5)';
-          el.style.background = 'hsl(var(--primary))';
-        }
-        setHoveredCity(city);
+      const marker = L.circleMarker([city.lat, city.lng], {
+        radius: isSelected ? 12 : 6,
+        fillColor: isSelected ? 'hsl(142, 76%, 36%)' : color,
+        color: '#ffffff',
+        weight: isSelected ? 3 : 1.5,
+        opacity: 1,
+        fillOpacity: isSelected ? 1 : 0.8,
+        className: 'city-marker-circle'
       });
-      
-      el.addEventListener('mouseleave', () => {
-        if (!isSelected) {
-          el.style.transform = 'scale(1)';
-          el.style.background = 'rgba(255, 255, 255, 0.7)';
-        }
-        setHoveredCity(null);
+
+      // Tooltip
+      marker.bindTooltip(`
+        <div style="text-align: center; padding: 4px 8px;">
+          <div style="font-size: 16px; margin-bottom: 2px;">${COUNTRY_FLAGS[city.countryCode] || '🏙️'}</div>
+          <strong>${city.name}</strong><br/>
+          <span style="opacity: 0.8; font-size: 11px;">${city.country}</span><br/>
+          <span style="color: #22c55e; font-weight: bold;">Éco: ${city.economicIndex}</span>
+        </div>
+      `, {
+        direction: 'top',
+        offset: [0, -8],
+        className: 'city-tooltip-leaflet'
       });
-      
-      el.addEventListener('click', () => {
+
+      marker.on('click', () => {
         onSelectCity(city);
       });
 
-      const marker = new mapboxgl.Marker({ element: el })
-        .setLngLat([city.lng, city.lat])
-        .addTo(map.current!);
+      marker.on('mouseover', () => {
+        if (!isSelected) {
+          marker.setRadius(10);
+          marker.setStyle({ fillOpacity: 1 });
+        }
+        setHoveredCity(city);
+      });
 
+      marker.on('mouseout', () => {
+        if (!isSelected) {
+          marker.setRadius(6);
+          marker.setStyle({ fillOpacity: 0.8 });
+        }
+        setHoveredCity(null);
+      });
+
+      marker.addTo(map.current!);
       markersRef.current.push(marker);
     });
   }, [filteredCities, selectedCity, mapReady, onSelectCity]);
@@ -212,11 +202,8 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
   useEffect(() => {
     if (!map.current || !selectedCity || !mapReady) return;
     
-    map.current.flyTo({
-      center: [selectedCity.lng, selectedCity.lat],
-      zoom: 5,
-      duration: 1500,
-      essential: true,
+    map.current.flyTo([selectedCity.lat, selectedCity.lng], 6, {
+      duration: 1.5,
     });
   }, [selectedCity, mapReady]);
 
@@ -238,17 +225,44 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
 
   const hasActiveFilters = Object.values(filters).some(Boolean) || activeContinent;
 
-  const handleTokenSubmit = () => {
-    if (mapboxToken.trim()) {
-      localStorage.setItem('mapbox_token', mapboxToken.trim());
-      setShowTokenInput(false);
-      // Force re-render to initialize map
-      window.location.reload();
-    }
-  };
-
   return (
     <div className="space-y-4">
+      {/* Custom CSS for Leaflet tooltips */}
+      <style>{`
+        .city-tooltip-leaflet {
+          background: rgba(0, 0, 0, 0.95) !important;
+          border: 1px solid rgba(255, 255, 255, 0.2) !important;
+          border-radius: 8px !important;
+          color: white !important;
+          font-size: 12px !important;
+          padding: 0 !important;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+        }
+        .city-tooltip-leaflet::before {
+          border-top-color: rgba(0, 0, 0, 0.95) !important;
+        }
+        .leaflet-container {
+          background: #1a1a2e !important;
+          font-family: inherit;
+        }
+        .leaflet-control-zoom a {
+          background: rgba(0, 0, 0, 0.8) !important;
+          color: white !important;
+          border-color: rgba(255, 255, 255, 0.2) !important;
+        }
+        .leaflet-control-zoom a:hover {
+          background: rgba(0, 0, 0, 0.95) !important;
+        }
+        .leaflet-control-attribution {
+          background: rgba(0, 0, 0, 0.6) !important;
+          color: rgba(255, 255, 255, 0.5) !important;
+          font-size: 10px !important;
+        }
+        .leaflet-control-attribution a {
+          color: rgba(255, 255, 255, 0.7) !important;
+        }
+      `}</style>
+
       {/* Search and Filters Bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -356,65 +370,11 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
         )}
       </AnimatePresence>
 
-      {/* Mapbox Token Input */}
-      {showTokenInput && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30"
-        >
-          <div className="flex items-start gap-3">
-            <Key className="w-5 h-5 text-amber-500 mt-0.5" />
-            <div className="flex-1 space-y-3">
-              <div>
-                <h4 className="font-semibold text-amber-200">Token Mapbox requis</h4>
-                <p className="text-xs text-amber-300/80 mt-1">
-                  Pour afficher la carte mondiale interactive, entrez votre token Mapbox public.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  value={mapboxToken}
-                  onChange={(e) => setMapboxToken(e.target.value)}
-                  placeholder="pk.eyJ1IjoieW91..."
-                  className="bg-card/50 border-amber-500/30 text-sm"
-                />
-                <Button 
-                  onClick={handleTokenSubmit}
-                  size="sm"
-                  className="bg-amber-500 hover:bg-amber-600 text-black"
-                >
-                  Activer
-                </Button>
-              </div>
-              <a 
-                href="https://account.mapbox.com/access-tokens/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
-              >
-                <ExternalLink className="w-3 h-3" />
-                Obtenir un token gratuit sur Mapbox
-              </a>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
       {/* Interactive World Map */}
       <div 
         ref={mapContainer}
-        className="relative w-full h-[280px] rounded-xl border border-border/50 overflow-hidden bg-slate-900"
+        className="relative w-full h-[280px] rounded-xl border border-border/50 overflow-hidden"
       >
-        {!mapboxToken && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90">
-            <div className="text-center">
-              <Globe className="w-12 h-12 text-muted-foreground mx-auto mb-2 opacity-50" />
-              <p className="text-sm text-muted-foreground">Entrez votre token Mapbox pour afficher la carte</p>
-            </div>
-          </div>
-        )}
-
         {/* Tooltip for hovered city */}
         <AnimatePresence>
           {hoveredCity && (
@@ -422,7 +382,7 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="absolute z-30 pointer-events-none top-4 left-4"
+              className="absolute z-[1000] pointer-events-none top-4 left-4"
             >
               <div className="bg-popover/95 backdrop-blur border border-border rounded-lg px-3 py-2 shadow-xl">
                 <div className="flex items-center gap-2">
@@ -442,7 +402,7 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
         </AnimatePresence>
 
         {/* Result count */}
-        <div className="absolute bottom-2 right-2 text-xs text-white/50 bg-black/50 px-2 py-1 rounded">
+        <div className="absolute bottom-2 right-2 z-[1000] text-xs text-white/50 bg-black/50 px-2 py-1 rounded">
           {filteredCities.length} ville{filteredCities.length > 1 ? 's' : ''}
         </div>
       </div>
@@ -478,133 +438,100 @@ export function WorldMapSelector({ selectedCity, onSelectCity }: WorldMapSelecto
             <div className="mt-3 flex flex-wrap gap-1.5">
               {selectedCity.techHub && (
                 <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-400">
-                  <Zap className="w-3 h-3 mr-1" /> Tech Hub
+                  <Zap className="w-3 h-3 mr-1" /> Hub Tech
                 </Badge>
               )}
               {selectedCity.financialCenter && (
                 <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400">
-                  <TrendingUp className="w-3 h-3 mr-1" /> Finance
+                  <TrendingUp className="w-3 h-3 mr-1" /> Centre Financier
                 </Badge>
               )}
               {selectedCity.industrialHub && (
                 <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400">
-                  <Factory className="w-3 h-3 mr-1" /> Industrie
+                  <Factory className="w-3 h-3 mr-1" /> Hub Industriel
                 </Badge>
               )}
               {selectedCity.portCity && (
                 <Badge variant="secondary" className="text-xs bg-cyan-500/20 text-cyan-400">
-                  <Ship className="w-3 h-3 mr-1" /> Port
+                  <Ship className="w-3 h-3 mr-1" /> Port Maritime
+                </Badge>
+              )}
+              {selectedCity.capital && (
+                <Badge variant="secondary" className="text-xs bg-amber-500/20 text-amber-400">
+                  <Landmark className="w-3 h-3 mr-1" /> Capitale
                 </Badge>
               )}
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              <div className="p-2 rounded-lg bg-card/50">
-                <p className="text-muted-foreground">Coût de la vie</p>
-                <p className="font-semibold">
-                  {selectedCity.costOfLiving < 0.8 ? '💚 Très bas' :
-                   selectedCity.costOfLiving < 1.0 ? '🟢 Bas' :
-                   selectedCity.costOfLiving < 1.2 ? '🟡 Moyen' :
-                   selectedCity.costOfLiving < 1.5 ? '🟠 Élevé' : '🔴 Très élevé'}
-                  {' '}(×{selectedCity.costOfLiving.toFixed(2)})
-                </p>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              <div className="p-2 rounded-lg bg-background/50">
+                <p className="text-lg font-bold">{selectedCity.population.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground">Population</p>
               </div>
-              <div className="p-2 rounded-lg bg-card/50">
-                <p className="text-muted-foreground">Population</p>
-                <p className="font-semibold">{(selectedCity.population / 1000000).toFixed(1)}M hab.</p>
+              <div className="p-2 rounded-lg bg-background/50">
+                <p className="text-lg font-bold">{Math.round(selectedCity.costOfLiving * 100)}%</p>
+                <p className="text-[10px] text-muted-foreground">Coût de vie</p>
+              </div>
+              <div className="p-2 rounded-lg bg-background/50">
+                <p className="text-lg font-bold">{selectedCity.economicIndex}</p>
+                <p className="text-[10px] text-muted-foreground">Indice éco.</p>
               </div>
             </div>
-
-            {Object.keys(selectedCity.bonus).length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs text-muted-foreground mb-1.5">Bonus de localisation</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {Object.entries(selectedCity.bonus).map(([key, value]) => (
-                    <span 
-                      key={key}
-                      className={cn(
-                        "px-2 py-0.5 rounded text-xs font-medium",
-                        value! > 0 ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
-                      )}
-                    >
-                      {value! > 0 ? '+' : ''}{value}% {
-                        key === 'revenue' ? 'Revenus' :
-                        key === 'costs' ? 'Coûts' :
-                        key === 'tech' ? 'Tech' :
-                        key === 'international' ? 'International' :
-                        key === 'industry' ? 'Industrie' :
-                        key === 'finance' ? 'Finance' :
-                        key === 'logistics' ? 'Logistique' :
-                        key === 'reputation' ? 'Réputation' : key
-                      }
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Quick Select - Top Cities */}
-      {!selectedCity && !searchQuery && (
-        <div>
-          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-            <Star className="w-3 h-3" /> Métropoles mondiales
-          </p>
-          <div className="flex flex-wrap gap-1.5">
+      {/* Top Cities Quick Select */}
+      {!selectedCity && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">Top villes économiques</p>
+          <div className="flex flex-wrap gap-2">
             {topCities.slice(0, 8).map(city => (
               <button
                 key={city.id}
                 onClick={() => onSelectCity(city)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-card/50 border border-border/50 hover:bg-primary/10 hover:border-primary/50 transition-all text-xs"
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-muted/30 border border-border/50 hover:bg-muted/50 hover:border-primary/50 transition-all flex items-center gap-1.5"
               >
                 <span>{COUNTRY_FLAGS[city.countryCode]}</span>
-                <span className="font-medium">{city.name}</span>
+                {city.name}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Cities List by Continent */}
-      <ScrollArea className="h-[180px]">
-        <div className="space-y-4 pr-4">
+      {/* City List by Continent */}
+      <ScrollArea className="h-[200px] rounded-xl border border-border/50 bg-card/20">
+        <div className="p-3 space-y-4">
           {Object.entries(citiesByContinent).map(([continent, cities]) => (
             <div key={continent}>
               <div className="flex items-center gap-2 mb-2">
-                <Globe className="w-4 h-4 text-muted-foreground" />
-                <h4 className="font-semibold text-sm">{continent}</h4>
-                <span className="text-xs text-muted-foreground">({cities.length})</span>
+                <Globe className="w-3 h-3 text-muted-foreground" />
+                <p className="text-xs font-semibold text-muted-foreground">{continent}</p>
+                <span className="text-xs text-muted-foreground/50">({cities.length})</span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                {cities.slice(0, 8).map(city => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {cities.slice(0, 9).map(city => (
                   <button
                     key={city.id}
                     onClick={() => onSelectCity(city)}
                     className={cn(
-                      "flex items-center gap-2 p-2 rounded-lg border text-left transition-all",
+                      "p-2 rounded-lg text-left text-xs transition-all border",
                       selectedCity?.id === city.id
                         ? "bg-primary/20 border-primary"
-                        : "bg-card/30 border-border/50 hover:bg-card/60 hover:border-border"
+                        : "bg-muted/20 border-transparent hover:bg-muted/40 hover:border-border"
                     )}
                   >
-                    <span className="text-lg">{COUNTRY_FLAGS[city.countryCode]}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{city.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{city.country}</p>
+                    <div className="flex items-center gap-1.5">
+                      <span>{COUNTRY_FLAGS[city.countryCode]}</span>
+                      <span className="font-medium truncate">{city.name}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-semibold text-primary">{city.economicIndex}</p>
-                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Éco: {city.economicIndex}
+                    </p>
                   </button>
                 ))}
               </div>
-              {cities.length > 8 && (
-                <p className="text-xs text-muted-foreground mt-1 ml-6">
-                  +{cities.length - 8} autres villes
-                </p>
-              )}
             </div>
           ))}
         </div>
