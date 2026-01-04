@@ -58,6 +58,7 @@ import {
 } from "@/data/extendedCreationOptions";
 import { formatCurrency, generateEmployee } from "@/utils/gameEngine";
 import { createCompany } from "@/utils/companyFactory";
+import { WorldCity, WORLD_CITIES } from "@/data/worldCities";
 import { 
   Building2, Scale, Factory, Cpu, Wrench, HeadphonesIcon, Cog,
   MapPin, User, Target, Zap, Shield, TrendingUp, Globe, Briefcase,
@@ -77,6 +78,7 @@ import { StepIndicator } from "./setup/SetupCarousel";
 import { OptionCard, OptionListItem } from "./setup/OptionCard";
 import { StepHeader } from "./setup/StepHeader";
 import { NavigationButtons } from "./setup/NavigationButtons";
+import { WorldMapSelector } from "./setup/WorldMapSelector";
 
 interface CompanySetupProps {
   onComplete: (company: Company, settings: GameSettings) => void;
@@ -86,7 +88,7 @@ export interface GameSettings {
   difficulty: Difficulty;
   gameMode: GameMode;
   founderType: FounderType;
-  location: Location;
+  location: WorldCity;
   startingBonus: StartingBonus;
   objective: GameObjective;
   legalStructure: LegalStructureType;
@@ -114,7 +116,6 @@ export interface GameSettings {
 type Difficulty = 'tutorial' | 'easy' | 'normal' | 'hard' | 'hardcore';
 type GameMode = 'sandbox' | 'career' | 'challenge' | 'speedrun' | 'survival';
 type FounderType = 'visionary' | 'manager' | 'technical' | 'commercial' | 'financier' | 'diplomat';
-type Location = 'paris' | 'lyon' | 'marseille' | 'bordeaux' | 'lille' | 'nantes' | 'toulouse' | 'strasbourg';
 type StartingBonus = 'none' | 'extra_cash' | 'skilled_team' | 'reputation' | 'technology' | 'contacts' | 'lucky';
 type GameObjective = 'millionaire' | 'empire' | 'innovation' | 'social' | 'international' | 'legacy' | 'freedom';
 
@@ -193,16 +194,8 @@ const founderOptions = [
   { value: 'diplomat' as FounderType, label: "Diplomate", description: "Vous gérez les relations.", bonus: "+20% Réputation", icon: Globe },
 ];
 
-const locationOptions = [
-  { value: 'paris' as Location, label: "Paris", description: "Capitale économique.", bonus: "+30% Revenus, +40% Coûts", icon: MapPin },
-  { value: 'lyon' as Location, label: "Lyon", description: "Carrefour industriel.", bonus: "+15% Industrie", icon: MapPin },
-  { value: 'marseille' as Location, label: "Marseille", description: "Port méditerranéen.", bonus: "+25% Import/Export", icon: MapPin },
-  { value: 'bordeaux' as Location, label: "Bordeaux", description: "Élégance et innovation.", bonus: "+15% Tech", icon: MapPin },
-  { value: 'lille' as Location, label: "Lille", description: "Proximité européenne.", bonus: "+20% Commerce EU", icon: MapPin },
-  { value: 'nantes' as Location, label: "Nantes", description: "Créativité et écologie.", bonus: "+25% Innovation", icon: MapPin },
-  { value: 'toulouse' as Location, label: "Toulouse", description: "Capitale aérospatiale.", bonus: "+30% Tech/Industrie", icon: MapPin },
-  { value: 'strasbourg' as Location, label: "Strasbourg", description: "Porte de l'Europe.", bonus: "+30% International", icon: MapPin },
-];
+// Default city (Paris)
+const DEFAULT_CITY = WORLD_CITIES.find(c => c.id === 'paris')!;
 
 const startingBonusOptions = [
   { value: 'none' as StartingBonus, label: "Aucun", description: "Partez de zéro.", effect: "Pas de bonus", icon: Shield },
@@ -236,7 +229,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const [gameMode, setGameMode] = useState<GameMode>('career');
   const [founderType, setFounderType] = useState<FounderType>('visionary');
-  const [location, setLocation] = useState<Location>('paris');
+  const [location, setLocation] = useState<WorldCity>(DEFAULT_CITY);
   const [startingBonus, setStartingBonus] = useState<StartingBonus>('none');
   const [objective, setObjective] = useState<GameObjective>('millionaire');
   const [expandedCategory, setExpandedCategory] = useState<string | null>('commercial');
@@ -567,36 +560,12 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
 
                 <div>
                   <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
-                    <MapPin className="w-4 h-4" /> Siège social
+                    <Globe className="w-4 h-4" /> Siège social mondial
                   </h3>
-                  <div className="grid grid-cols-4 gap-2">
-                    {locationOptions.map((option, index) => (
-                      <motion.button
-                        key={option.value}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: index * 0.03 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setLocation(option.value)}
-                        className={cn(
-                          "flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-center transition-all",
-                          location === option.value
-                            ? "border-primary bg-primary/10 shadow-lg shadow-primary/20"
-                            : "border-border/50 bg-card/30 hover:border-primary/40"
-                        )}
-                      >
-                        <MapPin className={cn(
-                          "w-4 h-4",
-                          location === option.value ? "text-primary" : "text-muted-foreground"
-                        )} />
-                        <span className={cn(
-                          "font-medium text-xs",
-                          location === option.value ? "text-primary" : "text-foreground"
-                        )}>{option.label}</span>
-                      </motion.button>
-                    ))}
-                  </div>
+                  <WorldMapSelector 
+                    selectedCity={location}
+                    onSelectCity={setLocation}
+                  />
                 </div>
               </div>
             </>
@@ -857,7 +826,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
                       { label: "Mode", value: gameModeOptions.find(o => o.value === gameMode)?.label },
                       { label: "Fondateur", value: founderOptions.find(o => o.value === founderType)?.label },
                       { label: "Secteur", value: sector ? sectorOptions.find(o => o.value === sector)?.label : '-' },
-                      { label: "Siège", value: locationOptions.find(o => o.value === location)?.label },
+                      { label: "Siège", value: `${location.name}, ${location.country}` },
                       { label: "Management", value: MANAGEMENT_STYLES[managementStyle]?.label },
                       { label: "Culture", value: CULTURE_TYPES[cultureType]?.label },
                       { label: "Télétravail", value: REMOTE_POLICIES[remotePolicy]?.label },
