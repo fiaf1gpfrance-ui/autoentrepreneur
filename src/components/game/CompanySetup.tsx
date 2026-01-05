@@ -58,7 +58,8 @@ import {
 } from "@/data/extendedCreationOptions";
 import { formatCurrency, generateEmployee } from "@/utils/gameEngine";
 import { createCompany } from "@/utils/companyFactory";
-import { WorldCity, WORLD_CITIES } from "@/data/worldCities";
+import { ExtendedCityData } from "@/types/ultraRealism";
+import { extendedWorldCities } from "@/data/extendedWorldCities";
 import { 
   Building2, Scale, Factory, Cpu, Wrench, HeadphonesIcon, Cog,
   MapPin, User, Target, Zap, Shield, TrendingUp, Globe, Briefcase,
@@ -88,7 +89,7 @@ export interface GameSettings {
   difficulty: Difficulty;
   gameMode: GameMode;
   founderType: FounderType;
-  location: WorldCity;
+  location: ExtendedCityData;
   startingBonus: StartingBonus;
   objective: GameObjective;
   legalStructure: LegalStructureType;
@@ -195,7 +196,7 @@ const founderOptions = [
 ];
 
 // Default city (Paris)
-const DEFAULT_CITY = WORLD_CITIES.find(c => c.id === 'paris')!;
+const DEFAULT_CITY = extendedWorldCities.find(c => c.id === 'paris') || extendedWorldCities[0];
 
 const startingBonusOptions = [
   { value: 'none' as StartingBonus, label: "Aucun", description: "Partez de zéro.", effect: "Pas de bonus", icon: Shield },
@@ -229,7 +230,7 @@ export function CompanySetup({ onComplete }: CompanySetupProps) {
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
   const [gameMode, setGameMode] = useState<GameMode>('career');
   const [founderType, setFounderType] = useState<FounderType>('visionary');
-  const [location, setLocation] = useState<WorldCity>(DEFAULT_CITY);
+  const [location, setLocation] = useState<ExtendedCityData>(DEFAULT_CITY);
   const [startingBonus, setStartingBonus] = useState<StartingBonus>('none');
   const [objective, setObjective] = useState<GameObjective>('millionaire');
   const [expandedCategory, setExpandedCategory] = useState<string | null>('commercial');
